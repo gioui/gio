@@ -279,6 +279,29 @@ func TestOHOSPumpBackgroundStopsFrames(t *testing.T) {
 	}
 }
 
+func TestOHOSPumpBackgroundCancelsActiveTouches(t *testing.T) {
+	p, f := newTestPump()
+	p.Handle(ohosEvent{kind: ohosEvSurfaceCreated, win: 7, w: 800, h: 600})
+	p.Handle(ohosEvent{kind: ohosEvTouch, action: 0, id: 3, x: 10, y: 20})
+	p.Handle(ohosEvent{kind: ohosEvTouch, action: 0, id: 4, x: 30, y: 20})
+	f.events = nil
+	p.Handle(ohosEvent{kind: ohosEvLifecycle, life: ohosBackground})
+	if len(f.events) != 2 {
+		t.Fatalf("want 2 cancel events, got %#v", f.events)
+	}
+	ids := make(map[pointer.ID]bool)
+	for _, ev := range f.events {
+		e, ok := ev.(pointer.Event)
+		if !ok || e.Kind != pointer.Cancel {
+			t.Fatalf("want pointer.Cancel, got %#v", ev)
+		}
+		ids[e.PointerID] = true
+	}
+	if !ids[3] || !ids[4] {
+		t.Fatalf("cancel ids = %v", ids)
+	}
+}
+
 func TestOHOSPumpAnimation(t *testing.T) {
 	p, f := newTestPump()
 	p.Handle(ohosEvent{kind: ohosEvSurfaceCreated, win: 7, w: 100, h: 100})

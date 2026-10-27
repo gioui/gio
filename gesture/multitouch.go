@@ -30,6 +30,7 @@ type Pinch struct {
 	active    bool
 	source    pointer.Source
 	startDist float32
+	lastScale float32
 	center    f32.Point
 	gestureID uint32
 	points    map[pointer.ID]f32.Point
@@ -144,6 +145,7 @@ func (p *Pinch) pickPair() {
 	if p.startDist < 1 {
 		p.startDist = 1
 	}
+	p.lastScale = 1
 	p.center = p.midpoint()
 	p.gestureID++
 	p.active = true
@@ -163,6 +165,11 @@ func (p *Pinch) emitUpdate(e pointer.Event) {
 		return
 	}
 	scale := p.distance() / p.startDist
+	// Ignore sub-0.5% jitter so rotating fingers do not look like a pinch.
+	if abs32(scale-p.lastScale) < 0.005 {
+		return
+	}
+	p.lastScale = scale
 	p.center = p.midpoint()
 	p.pending = append(p.pending, pointer.Event{
 		Kind:      pointer.Pinch,
@@ -205,16 +212,17 @@ func (p *Pinch) midpoint() f32.Point {
 // Rotate detects two-finger rotation gestures from raw touch events and
 // emits semantic pointer.Rotate events.
 type Rotate struct {
-	id1, id2  pointer.ID
-	hasTwo    bool
-	active    bool
-	source    pointer.Source
-	lastAngle float32
-	rotation  float32
-	center    f32.Point
-	gestureID uint32
-	points    map[pointer.ID]f32.Point
-	pending   []pointer.Event
+	id1, id2    pointer.ID
+	hasTwo      bool
+	active      bool
+	source      pointer.Source
+	lastAngle   float32
+	rotation    float32
+	lastEmitted float32
+	center      f32.Point
+	gestureID   uint32
+	points      map[pointer.ID]f32.Point
+	pending     []pointer.Event
 }
 
 // Add registers the gesture to receive pointer events.
@@ -323,6 +331,7 @@ func (r *Rotate) pickPair() {
 	r.hasTwo = true
 	r.lastAngle = r.angle()
 	r.rotation = 0
+	r.lastEmitted = 0
 	r.center = r.midpoint()
 	r.gestureID++
 	r.active = true
@@ -347,6 +356,10 @@ func (r *Rotate) emitUpdate(e pointer.Event) {
 	}
 	r.lastAngle = a
 	r.rotation += delta
+	if abs32(r.rotation-r.lastEmitted) < 0.01 {
+		return
+	}
+	r.lastEmitted = r.rotation
 	r.center = r.midpoint()
 	r.pending = append(r.pending, pointer.Event{
 		Kind:      pointer.Rotate,
@@ -377,6 +390,13 @@ func (r *Rotate) angle() float32 {
 	a := r.points[r.id1]
 	b := r.points[r.id2]
 	return float32(math.Atan2(float64(a.Y-b.Y), float64(a.X-b.X)))
+}
+
+func abs32(v float32) float32 {
+	if v < 0 {
+		return -v
+	}
+	return v
 }
 
 func (r *Rotate) midpoint() f32.Point {

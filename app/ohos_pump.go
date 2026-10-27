@@ -319,6 +319,7 @@ func (p *ohosPump) surface(win uintptr, w, h int, sync bool) {
 }
 
 func (p *ohosPump) surfaceDestroyed() {
+	p.cancelActiveTouches()
 	p.activeTouches = make(map[int]bool)
 	p.resetPinch()
 	p.frameRequested = false
@@ -433,6 +434,7 @@ func (p *ohosPump) setFocused(focused bool) {
 	}
 	p.config.Focused = focused
 	if !focused {
+		p.cancelActiveTouches()
 		p.mouseButtons = 0
 		p.activeTouches = make(map[int]bool)
 	}
@@ -453,6 +455,7 @@ func (p *ohosPump) setLifecycle(l ohosLifecycle) {
 	switch l {
 	case ohosBackground:
 		p.life = ohosBackground
+		p.cancelActiveTouches()
 		p.activeTouches = make(map[int]bool)
 		p.resetPinch()
 		p.lastTouch = time.Time{}
@@ -467,6 +470,24 @@ func (p *ohosPump) setLifecycle(l ohosLifecycle) {
 	case ohosDestroyed:
 		p.life = ohosDestroyed
 		p.Stop()
+	}
+}
+
+// cancelActiveTouches delivers Cancel for every pointer still down. Without
+// this, a system gesture that backgrounds the window leaves recognizers with
+// stale pressed pointers and all later gestures are ignored.
+func (p *ohosPump) cancelActiveTouches() {
+	if len(p.activeTouches) == 0 {
+		return
+	}
+	t := time.Since(p.start)
+	for id := range p.activeTouches {
+		p.sink.ohosDeliver(pointer.Event{
+			Kind:      pointer.Cancel,
+			Source:    pointer.Touch,
+			PointerID: pointer.ID(id),
+			Time:      t,
+		})
 	}
 }
 

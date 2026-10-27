@@ -300,6 +300,8 @@ func (a *appState) recordFallback(e pointer.Event) {
 	a.fallbackCount[e.Kind]++
 	a.fallbackLast = e
 	a.fallbackHas = true
+	debugLog(fmt.Sprintf("fallback kind=%v phase=%v scale=%.4f rotation=%.4f swipe=%v fingers=%d",
+		e.Kind, phaseLabel(e), e.Scale, e.Rotation, e.Swipe, e.Fingers))
 	log.Printf("fallback kind=%v source=%v phase=%v scale=%.4f rotation=%.4f swipe=%v fingers=%d",
 		e.Kind, e.Source, phaseLabel(e), e.Scale, e.Rotation, e.Swipe, e.Fingers)
 }
@@ -314,7 +316,7 @@ func (a *appState) details(gtx layout.Context) layout.Dimensions {
 		fmt.Sprintf("scale=%.4f  rotation=%.4f rad  swipe=%v  fingers=%d", e.Scale, e.Rotation, e.Swipe, e.Fingers),
 		fmt.Sprintf("position=%v  pointerID=%d  gestureID=%d  time=%v  buttons=%v", e.Position, e.PointerID, e.GestureID, e.Time, e.Buttons),
 	}
-	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+	children := []layout.FlexChild{
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 			return material.Body1(a.theme, lines[0]).Layout(gtx)
 		}),
@@ -324,7 +326,15 @@ func (a *appState) details(gtx layout.Context) layout.Dimensions {
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 			return material.Caption(a.theme, lines[2]).Layout(gtx)
 		}),
-	)
+	}
+	if a.fallbackHas {
+		fe := a.fallbackLast
+		children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+			return material.Body2(a.theme, fmt.Sprintf("Fallback: %v  phase=%v  scale=%.4f  rotation=%.4f  swipe=%v",
+				fe.Kind, phaseLabel(fe), fe.Scale, fe.Rotation, fe.Swipe)).Layout(gtx)
+		}))
+	}
+	return layout.Flex{Axis: layout.Vertical}.Layout(gtx, children...)
 }
 
 func (a *appState) log(gtx layout.Context) layout.Dimensions {
