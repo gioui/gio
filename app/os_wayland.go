@@ -37,6 +37,10 @@ import (
 //go:generate wayland-scanner client-header /usr/share/wayland-protocols/stable/xdg-shell/xdg-shell.xml wayland_xdg_shell.h
 //go:generate wayland-scanner private-code /usr/share/wayland-protocols/stable/xdg-shell/xdg-shell.xml wayland_xdg_shell.c
 
+//go:generate wayland-scanner client-header /usr/share/wayland-protocols/unstable/pointer-gestures/pointer-gestures-unstable-v1.xml wayland_pointer_gestures.h
+//go:generate wayland-scanner private-code /usr/share/wayland-protocols/unstable/pointer-gestures/pointer-gestures-unstable-v1.xml wayland_pointer_gestures.c
+//go:generate sed -i "1s;^;//go:build ((linux \&\& !android) || freebsd) \&\& !nowayland\n\n;" wayland_pointer_gestures.c
+
 //go:generate wayland-scanner client-header /usr/share/wayland-protocols/unstable/text-input/text-input-unstable-v3.xml wayland_text_input.h
 //go:generate wayland-scanner private-code /usr/share/wayland-protocols/unstable/text-input/text-input-unstable-v3.xml wayland_text_input.c
 
@@ -59,6 +63,7 @@ import (
 #include "wayland_text_input.h"
 #include "wayland_xdg_shell.h"
 #include "wayland_xdg_decoration.h"
+#include "wayland_pointer_gestures.h"
 
 extern const struct wl_registry_listener gio_registry_listener;
 extern const struct wl_surface_listener gio_surface_listener;
@@ -72,6 +77,9 @@ extern const struct wl_seat_listener gio_seat_listener;
 extern const struct wl_pointer_listener gio_pointer_listener;
 extern const struct wl_touch_listener gio_touch_listener;
 extern const struct wl_keyboard_listener gio_keyboard_listener;
+extern const struct zwp_pointer_gesture_pinch_v1_listener gio_pinch_listener;
+extern const struct zwp_pointer_gesture_swipe_v1_listener gio_swipe_listener;
+extern const struct zwp_pointer_gesture_hold_v1_listener gio_hold_listener;
 extern const struct zwp_text_input_v3_listener gio_zwp_text_input_v3_listener;
 extern const struct wl_data_device_listener gio_data_device_listener;
 extern const struct wl_data_offer_listener gio_data_offer_listener;
@@ -85,6 +93,8 @@ type wlDisplay struct {
 	compositor        *C.struct_wl_compositor
 	wm                *C.struct_xdg_wm_base
 	imm               *C.struct_zwp_text_input_manager_v3
+	gestures          *C.struct_zwp_pointer_gestures_v1
+	gesturesVersion   C.uint32_t
 	shm               *C.struct_wl_shm
 	dataDeviceManager *C.struct_wl_data_device_manager
 	decor             *C.struct_zxdg_decoration_manager_v1
@@ -110,11 +120,21 @@ type wlSeat struct {
 	pointer  *C.struct_wl_pointer
 	touch    *C.struct_wl_touch
 	keyboard *C.struct_wl_keyboard
-	im       *C.struct_zwp_text_input_v3
-	imFocus  *window
-	imActive bool
-	imHint   key.InputHint
-	imState  textInputState
+	pinch    *C.struct_zwp_pointer_gesture_pinch_v1
+	swipe    *C.struct_zwp_pointer_gesture_swipe_v1
+	hold     *C.struct_zwp_pointer_gesture_hold_v1
+
+	gestureID      uint32
+	gestureKind    pointer.Kind
+	gestureWin     *window
+	gestureFingers uint8
+	swipeAccum     f32.Point
+	pinchRotation  float32
+	im             *C.struct_zwp_text_input_v3
+	imFocus        *window
+	imActive       bool
+	imHint         key.InputHint
+	imState        textInputState
 
 	// The most recent input serial.
 	serial C.uint32_t
@@ -497,6 +517,7 @@ func (s *wlSeat) destroy() {
 	}
 	s.imFocus = nil
 	s.resetTextInputState()
+	s.releaseGestures()
 	if s.pointer != nil {
 		C.wl_pointer_release(s.pointer)
 	}
@@ -515,6 +536,40 @@ func (s *wlSeat) destroy() {
 		callbackDelete(unsafe.Pointer(s.seat))
 		C.wl_seat_release(s.seat)
 	}
+}
+
+func (s *wlSeat) initGestures() {
+	if s.disp.gestures == nil || s.pointer == nil {
+		return
+	}
+	if s.pinch == nil {
+		s.pinch = C.zwp_pointer_gestures_v1_get_pinch_gesture(s.disp.gestures, s.pointer)
+		C.zwp_pointer_gesture_pinch_v1_add_listener(s.pinch, &C.gio_pinch_listener, unsafe.Pointer(s.seat))
+	}
+	if s.swipe == nil {
+		s.swipe = C.zwp_pointer_gestures_v1_get_swipe_gesture(s.disp.gestures, s.pointer)
+		C.zwp_pointer_gesture_swipe_v1_add_listener(s.swipe, &C.gio_swipe_listener, unsafe.Pointer(s.seat))
+	}
+	if s.disp.gesturesVersion >= 3 && s.hold == nil {
+		s.hold = C.zwp_pointer_gestures_v1_get_hold_gesture(s.disp.gestures, s.pointer)
+		C.zwp_pointer_gesture_hold_v1_add_listener(s.hold, &C.gio_hold_listener, unsafe.Pointer(s.seat))
+	}
+}
+
+func (s *wlSeat) releaseGestures() {
+	if s.pinch != nil {
+		C.zwp_pointer_gesture_pinch_v1_destroy(s.pinch)
+		s.pinch = nil
+	}
+	if s.swipe != nil {
+		C.zwp_pointer_gesture_swipe_v1_destroy(s.swipe)
+		s.swipe = nil
+	}
+	if s.hold != nil {
+		C.zwp_pointer_gesture_hold_v1_destroy(s.hold)
+		s.hold = nil
+	}
+	s.gestureWin = nil
 }
 
 func (s *wlSeat) initTextInput() {
@@ -540,7 +595,9 @@ func (s *wlSeat) updateCaps(caps C.uint32_t) {
 	case s.pointer == nil && caps&C.WL_SEAT_CAPABILITY_POINTER != 0:
 		s.pointer = C.wl_seat_get_pointer(s.seat)
 		C.wl_pointer_add_listener(s.pointer, &C.gio_pointer_listener, unsafe.Pointer(s.seat))
+		s.initGestures()
 	case s.pointer != nil && caps&C.WL_SEAT_CAPABILITY_POINTER == 0:
+		s.releaseGestures()
 		C.wl_pointer_release(s.pointer)
 		s.pointer = nil
 	}
@@ -713,7 +770,18 @@ func gio_onRegistryGlobal(data unsafe.Pointer, reg *C.struct_wl_registry, name C
 		callbackStore(unsafe.Pointer(s), d.seat)
 		C.wl_seat_add_listener(s, &C.gio_seat_listener, unsafe.Pointer(s))
 		d.seat.initTextInput()
+		d.seat.initGestures()
 		d.bindDataDevice()
+	case "zwp_pointer_gestures_v1":
+		v := version
+		if v > 3 {
+			v = 3
+		}
+		d.gestures = (*C.struct_zwp_pointer_gestures_v1)(C.wl_registry_bind(reg, name, &C.zwp_pointer_gestures_v1_interface, v))
+		d.gesturesVersion = v
+		if d.seat != nil {
+			d.seat.initGestures()
+		}
 	case "wl_shm":
 		d.shm = (*C.struct_wl_shm)(C.wl_registry_bind(reg, name, &C.wl_shm_interface, 1))
 	case "xdg_wm_base":
@@ -2183,6 +2251,10 @@ func (d *wlDisplay) destroy() {
 		d.seat.destroy()
 		d.seat = nil
 	}
+	if d.gestures != nil {
+		C.zwp_pointer_gestures_v1_destroy(d.gestures)
+		d.gestures = nil
+	}
 	if d.imm != nil {
 		C.zwp_text_input_manager_v3_destroy(d.imm)
 	}
@@ -2218,4 +2290,148 @@ func fromFixed(v C.wl_fixed_t) float32 {
 	b := ((1023 + 44) << 52) + (1 << 51) + uint64(v)
 	f := math.Float64frombits(b) - (3 << 43)
 	return float32(f)
+}
+
+func (s *wlSeat) gestureEvent(kind pointer.Kind, phase pointer.GesturePhase, t C.uint32_t) {
+	w := s.gestureWin
+	if w == nil {
+		return
+	}
+	w.ProcessEvent(pointer.Event{
+		Kind:      kind,
+		Source:    pointer.Trackpad,
+		GestureID: s.gestureID,
+		Phase:     phase,
+		Fingers:   s.gestureFingers,
+		Position:  w.lastPos,
+		Time:      time.Duration(t) * time.Millisecond,
+		Modifiers: w.disp.xkb.Modifiers(),
+	})
+}
+
+func (s *wlSeat) gestureBegin(kind pointer.Kind, surf *C.struct_wl_surface, t C.uint32_t, fingers C.uint32_t) {
+	if surf == nil {
+		return
+	}
+	w, ok := callbackLoad(unsafe.Pointer(surf)).(*window)
+	if !ok || w == nil {
+		return
+	}
+	s.gestureID++
+	s.gestureKind = kind
+	s.gestureWin = w
+	if fingers > 255 {
+		fingers = 255
+	}
+	s.gestureFingers = uint8(fingers)
+	s.swipeAccum = f32.Point{}
+	s.pinchRotation = 0
+	s.gestureEvent(kind, pointer.GestureBegin, t)
+}
+
+//export gio_onPinchBegin
+func gio_onPinchBegin(data unsafe.Pointer, obj *C.struct_zwp_pointer_gesture_pinch_v1, serial, t C.uint32_t, surf *C.struct_wl_surface, fingers C.uint32_t) {
+	s := callbackLoad(data).(*wlSeat)
+	s.serial = serial
+	s.gestureBegin(pointer.Pinch, surf, t, fingers)
+}
+
+//export gio_onPinchUpdate
+func gio_onPinchUpdate(data unsafe.Pointer, obj *C.struct_zwp_pointer_gesture_pinch_v1, t C.uint32_t, dx, dy, scale, rotation C.wl_fixed_t) {
+	s := callbackLoad(data).(*wlSeat)
+	w := s.gestureWin
+	if w == nil {
+		return
+	}
+	s.pinchRotation += float32(fromFixed(rotation)) * math.Pi / 180
+	w.ProcessEvent(pointer.Event{
+		Kind:      pointer.Pinch,
+		Source:    pointer.Trackpad,
+		GestureID: s.gestureID,
+		Phase:     pointer.GestureUpdate,
+		Scale:     fromFixed(scale),
+		Rotation:  s.pinchRotation,
+		Swipe:     f32.Pt(fromFixed(dx), fromFixed(dy)),
+		Fingers:   s.gestureFingers,
+		Position:  w.lastPos,
+		Time:      time.Duration(t) * time.Millisecond,
+		Modifiers: w.disp.xkb.Modifiers(),
+	})
+}
+
+//export gio_onPinchEnd
+func gio_onPinchEnd(data unsafe.Pointer, obj *C.struct_zwp_pointer_gesture_pinch_v1, serial, t C.uint32_t, cancelled C.int32_t) {
+	s := callbackLoad(data).(*wlSeat)
+	if s.gestureWin == nil {
+		return
+	}
+	phase := pointer.GestureEnd
+	if cancelled != 0 {
+		phase = pointer.GestureCancel
+	}
+	s.gestureEvent(pointer.Pinch, phase, t)
+	s.gestureWin = nil
+}
+
+//export gio_onSwipeBegin
+func gio_onSwipeBegin(data unsafe.Pointer, obj *C.struct_zwp_pointer_gesture_swipe_v1, serial, t C.uint32_t, surf *C.struct_wl_surface, fingers C.uint32_t) {
+	s := callbackLoad(data).(*wlSeat)
+	s.serial = serial
+	s.gestureBegin(pointer.Swipe, surf, t, fingers)
+}
+
+//export gio_onSwipeUpdate
+func gio_onSwipeUpdate(data unsafe.Pointer, obj *C.struct_zwp_pointer_gesture_swipe_v1, t C.uint32_t, dx, dy C.wl_fixed_t) {
+	s := callbackLoad(data).(*wlSeat)
+	w := s.gestureWin
+	if w == nil {
+		return
+	}
+	s.swipeAccum = s.swipeAccum.Add(f32.Pt(fromFixed(dx), fromFixed(dy)))
+	w.ProcessEvent(pointer.Event{
+		Kind:      pointer.Swipe,
+		Source:    pointer.Trackpad,
+		GestureID: s.gestureID,
+		Phase:     pointer.GestureUpdate,
+		Swipe:     s.swipeAccum,
+		Fingers:   s.gestureFingers,
+		Position:  w.lastPos,
+		Time:      time.Duration(t) * time.Millisecond,
+		Modifiers: w.disp.xkb.Modifiers(),
+	})
+}
+
+//export gio_onSwipeEnd
+func gio_onSwipeEnd(data unsafe.Pointer, obj *C.struct_zwp_pointer_gesture_swipe_v1, serial, t C.uint32_t, cancelled C.int32_t) {
+	s := callbackLoad(data).(*wlSeat)
+	if s.gestureWin == nil {
+		return
+	}
+	phase := pointer.GestureEnd
+	if cancelled != 0 {
+		phase = pointer.GestureCancel
+	}
+	s.gestureEvent(pointer.Swipe, phase, t)
+	s.gestureWin = nil
+}
+
+//export gio_onHoldBegin
+func gio_onHoldBegin(data unsafe.Pointer, obj *C.struct_zwp_pointer_gesture_hold_v1, serial, t C.uint32_t, surf *C.struct_wl_surface, fingers C.uint32_t) {
+	s := callbackLoad(data).(*wlSeat)
+	s.serial = serial
+	s.gestureBegin(pointer.Hold, surf, t, fingers)
+}
+
+//export gio_onHoldEnd
+func gio_onHoldEnd(data unsafe.Pointer, obj *C.struct_zwp_pointer_gesture_hold_v1, serial, t C.uint32_t, cancelled C.int32_t) {
+	s := callbackLoad(data).(*wlSeat)
+	if s.gestureWin == nil {
+		return
+	}
+	phase := pointer.GestureEnd
+	if cancelled != 0 {
+		phase = pointer.GestureCancel
+	}
+	s.gestureEvent(pointer.Hold, phase, t)
+	s.gestureWin = nil
 }
