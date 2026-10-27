@@ -3,7 +3,7 @@
 > 依据：[input-gestures-cross-platform.md](input-gestures-cross-platform.md) 的矩阵、源码复核与平台 API 结论。
 > 状态：实施中；已完成部分与剩余工作见 §0.0。
 > 目标：把 Gio 从“鼠标/触摸 + Scroll”升级为“可区分设备、可拿语义手势、可回退识别”的输入模型，并修正 Windows/macOS/Wayland/OHOS 的具体缺口。
-> 实施进展（2026-10-27）：事件模型与语义手势路由、macOS pinch/rotate/swipe、Wayland `zwp_pointer_gestures_v1`、OHOS 真机 pinch/rotate/swipe、Windows PT_* 分类/触控板注册 + WM_GESTURE pinch/rotate、gesture.Pinch/Rotate/Swipe/Hold 与互斥 ZoomRotate 已落地；Wayland 真触控板验收、Windows Precision Touchpad 的 InteractionContext、OHOS Hold、Android/iOS/Web 接线仍待做。
+> 实施进展（2026-10-27）：事件模型与语义手势路由、macOS pinch/rotate/swipe、Wayland `zwp_pointer_gestures_v1`、OHOS 真机 pinch/rotate/swipe/hold、Windows PT_* 分类/触控板注册 + WM_GESTURE pinch/rotate、gesture.Pinch/Rotate/Swipe/Hold 与互斥 ZoomRotate 已落地；Wayland 真触控板验收、Windows Precision Touchpad 的 InteractionContext、OHOS Hold、Android/iOS/Web 接线仍待做。
 
 ## 0.0 执行状态（截至 2026-10-27）
 
@@ -36,7 +36,7 @@
 | WP3 macOS 语义手势 | 完成（代码 + 本机验收） | 2026-10-27 本机验证 pinch/rotate/scroll、左右键、双击、真实触点数；三指 Swipe 受系统“轻扫切换页面”设置影响 |
 | WP4 Wayland 语义手势 | 实现完成；协议绑定 + host 映射测试通过 | Fedora 44 完整构建（含 Vulkan）通过；pinch/swipe/hold Begin/Update/End/Cancel、Scale/Rotation/Swipe 累加有测试；真实触控板 E2E 未完成 |
 | P2 能力查询 | 完成 | `pointer.Capabilities` + `Window.Capabilities()`，macOS/Windows/Wayland/OHOS 已实现 |
-| WP5 OHOS 手势 | 核心完成 + 真机验收 | VYG-AL00 验证连续 pinch/rotate/swipe、单指/双击；Hold 未验；2in1 未验 |
+| WP5 OHOS 手势 | 核心完成 + 真机验收 | VYG-AL00 验证连续 pinch/rotate/swipe、三指 Hold、单指/双击；2in1 未验 |
 | 文档 | 完成 | 本文件 + [input-gestures-cross-platform.md](input-gestures-cross-platform.md) |
 
 ### 剩余工作
@@ -45,20 +45,20 @@
 |---|---|---|---|---|
 | P0 | WP4 Wayland 验收 | 用真实 USB 触控板回放 pinch/rotate/swipe/hold；核对 Scale/Rotation/Swipe/Fingers | 1 天 | 需要 USB 触控板直通 Fedora；虚拟设备被 libinput jump detector 丢弃 |
 | P0 | WP2 Windows Precision Touchpad | `InteractionContext`/触控板帧解析，输出 pinch/rotate/pan | 3 天 | 需要 Precision Touchpad 设备验证 |
-| P1 | WP5 OHOS 收尾 | Hold 真机验收；2in1 触控板 rotate/swipe 验证；补接入文档；可选 ABI 导出 | 1–2 天；可选 3 天 shim | 需要 Hold/2in1 设备 |
+| P1 | WP5 OHOS 收尾 | 2in1 触控板 rotate/swipe 验证；补接入文档；可选 ABI 导出 | 1 天；可选 3 天 shim | 需要 2in1 设备 |
 | P1 | WP6 Android/iOS | 原生 ScaleGestureDetector/UIGestureRecognizer 或后端接入 gesture 包；iPad 间接指针/hover | 4 天 | 需要 Android/iPad 设备 |
 | P2 | WP7 Web | Pointer Events 优先、wheel ctrl 回退、Safari GestureEvent、touch-action | 2 天 | 需要浏览器矩阵 |
 | P2 | WP8 仲裁/能力 | 能力查询已完成；Windows 全局手势 opt-in、系统手势说明、避免原生+回退双触发 | 2 天 | 需先完成平台接入 |
 | P2 | WP9 测试/CI | 后端事件 golden trace；真机矩阵；CI 手势测试；模拟器 GPU shader 兼容 | 3–4 天 | 依赖设备/模拟器 |
 | P3 | M4 长尾 | Pen 压力/倾斜、原始触控板帧、触觉 | 1–2 周 | 单独立项 |
 
-**剩余合计**：约 16 Go 人日（含 Wayland/OHOS 验收）+ 可选 3 天 shim；单人含缓冲约 4 周，双人约 2.5 周。
+**剩余合计**：约 15 Go 人日（含 Wayland/OHOS 验收）+ 可选 3 天 shim；单人含缓冲约 4 周，双人约 2.5 周。
 
 ### 建议执行顺序
 
 1. **Wayland 真触控板验收**：实现已完成；需要 USB 触控板直通 Fedora。
 2. **Windows InteractionContext**：补齐 Precision Touchpad，而不只触摸屏 WM_GESTURE。
-3. **OHOS 收尾**：Hold 真机验收、2in1 触控板验证、接入文档。
+3. **OHOS 收尾**：2in1 触控板验证、接入文档。
 4. **Android/iOS**：把已完成的 gesture 回退包接到后端，或接原生识别器。
 5. **Web**、**仲裁/能力**、**真机矩阵/模拟器 GPU**。
 6. **Pen/原始帧**按需进入 M4。
@@ -74,7 +74,7 @@
 | Windows `go test -c` | 通过 |
 | macOS 后端编译/测试 | 通过 |
 | OHOS arm64 交叉编译 | 通过 |
-| 新增语义手势真机验收 | **macOS、OHOS VYG-AL00 通过**；Windows 仍待设备验收 |
+| 新增语义手势真机验收 | **macOS、OHOS VYG-AL00 通过（含三指 Hold）**；Windows 仍待设备验收 |
 | Wayland 构建/协议绑定 | Fedora 44 `go build -tags novulkan` 通过；manager/pinch/swipe/hold 对象创建成功 |
 | Wayland 手势 E2E | **未完成**：虚拟触控板被 libinput jump detector 丢弃，需真实 USB 触控板 |
 | P2 `pointer.Capabilities` | 通过，含单测 |

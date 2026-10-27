@@ -81,7 +81,7 @@ OHOS 手机上的预期：
 | 双指捏合/张开 | Fallback Pinch 增加，Scale 连续 |
 | 双指旋转 | Fallback Rotate 增加 |
 | 三指滑动 | Fallback Swipe 增加 |
-| 双指长按 500ms | Fallback Hold 增加 |
+| 三指长按 500ms | Fallback Hold 增加（HarmonyOS 双指长按被系统识屏占用） |
 | 单指点击/拖动 | Press/Move/Drag、Clicks/Double 正常 |
 
 构建为 OHOS c-shared 库时，`ohos.go` 提供 shim 需要的 `gpofd_start`、`gpofd_open_uri`、`gpofd_abi_version`。
@@ -96,3 +96,5 @@ OHOS 手机上的预期：
 - 需要同时支持缩放+旋转的应用可以自行组合两个识别器，或用 `ZoomRotate` 的阈值调优。
 
 选择互斥的典型理由：避免触控板/触摸屏的轻微距离变化被误判成 Pinch，或轻微角度变化被误判成 Rotate。
+
+> HarmonyOS 的“双指长按识屏”是系统级手势，应用收不到该触摸序列；Hold 验证请用三指长按。

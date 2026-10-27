@@ -51,9 +51,11 @@ type appState struct {
 	lastPressPos f32.Point
 	lastPressBtn pointer.Buttons
 
-	zoomRotate    gesture.ZoomRotate
-	swipe         gesture.Swipe
-	hold          gesture.Hold
+	zoomRotate gesture.ZoomRotate
+	swipe      gesture.Swipe
+	hold       gesture.Hold
+
+	invalidate    func()
 	fallbackCount map[pointer.Kind]int
 	fallbackLast  pointer.Event
 	fallbackHas   bool
@@ -87,6 +89,8 @@ func loop(w *app.Window) error {
 		counts:        make(map[pointer.Kind]int),
 		fallbackCount: make(map[pointer.Kind]int),
 	}
+	a.hold.MinFingers = 3
+	a.invalidate = w.Invalidate
 	var ops op.Ops
 	for {
 		switch e := w.Event().(type) {
@@ -111,7 +115,7 @@ func (a *appState) layout(gtx layout.Context) layout.Dimensions {
 				return layout.Spacer{Height: unit.Dp(4)}.Layout(gtx)
 			}),
 			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-				return material.Body2(a.theme, "Move the pointer into the panel. Try two-finger pinch/rotate/scroll and three-finger swipe. Native semantic events and raw pointer events are shown below.").Layout(gtx)
+				return material.Body2(a.theme, "Move the pointer into the panel. Try two-finger pinch/rotate/scroll, three-finger swipe, and three-finger hold. On HarmonyOS, two-finger long-press is reserved for system text recognition.").Layout(gtx)
 			}),
 			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 				return layout.Spacer{Height: unit.Dp(10)}.Layout(gtx)
@@ -223,6 +227,11 @@ func (a *appState) record(e pointer.Event, now time.Time) {
 	}
 	if e.Kind == pointer.Press || e.Kind == pointer.Release || e.Kind == pointer.Cancel {
 		debugLog(fmt.Sprintf("raw %v id=%d pos=%v", e.Kind, e.PointerID, e.Position))
+	}
+	if e.Kind == pointer.Press && a.invalidate != nil {
+		// Hold is time-based; request one frame after its 500ms threshold so
+		// the otherwise idle window runs Hold.Update.
+		time.AfterFunc(600*time.Millisecond, a.invalidate)
 	}
 	a.events = append(a.events, e)
 	if len(a.events) > history {
