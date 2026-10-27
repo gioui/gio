@@ -51,8 +51,7 @@ type appState struct {
 	lastPressPos f32.Point
 	lastPressBtn pointer.Buttons
 
-	pinch         gesture.Pinch
-	rotate        gesture.Rotate
+	zoomRotate    gesture.ZoomRotate
 	swipe         gesture.Swipe
 	hold          gesture.Hold
 	fallbackCount map[pointer.Kind]int
@@ -153,8 +152,7 @@ func (a *appState) counterRow(gtx layout.Context) layout.Dimensions {
 		a.lastPress = 0
 		a.fallbackCount = make(map[pointer.Kind]int)
 		a.fallbackHas = false
-		a.pinch = gesture.Pinch{}
-		a.rotate = gesture.Rotate{}
+		a.zoomRotate = gesture.ZoomRotate{}
 		a.swipe = gesture.Swipe{}
 		a.hold = gesture.Hold{}
 	}
@@ -262,14 +260,24 @@ func (a *appState) feedFallback(e pointer.Event, now time.Time) {
 	if !rawPointerKind(e.Kind) {
 		return
 	}
-	a.drain(&a.pinch, e)
-	a.drain(&a.rotate, e)
+	a.drainZoomRotate(e)
 	a.drain(&a.swipe, e)
 	src := &replaySource{events: []pointer.Event{e}}
 	for {
 		fe, ok := a.hold.Update(src, now)
 		if !ok {
 			break
+		}
+		a.recordFallback(fe)
+	}
+}
+
+func (a *appState) drainZoomRotate(e pointer.Event) {
+	src := &replaySource{events: []pointer.Event{e}}
+	for {
+		fe, ok := a.zoomRotate.Update(src)
+		if !ok {
+			return
 		}
 		a.recordFallback(fe)
 	}

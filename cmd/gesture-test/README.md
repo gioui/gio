@@ -85,3 +85,14 @@ OHOS 手机上的预期：
 | 单指点击/拖动 | Press/Move/Drag、Clicks/Double 正常 |
 
 构建为 OHOS c-shared 库时，`ohos.go` 提供 shim 需要的 `gpofd_start`、`gpofd_open_uri`、`gpofd_abi_version`。
+
+## Pinch / Rotate 互斥
+
+测试程序的 Fallback 使用 `gesture.ZoomRotate`，而不是同时运行 `gesture.Pinch` 和 `gesture.Rotate`：
+
+- 双指移动后，按缩放比例和旋转角度的主导方向锁定本次手势；
+- 一旦锁定，整段手势只发 Pinch 或只发 Rotate；
+- 默认阈值：5% 缩放、0.08 rad 旋转、1.5x 主导比；
+- 需要同时支持缩放+旋转的应用可以自行组合两个识别器，或用 `ZoomRotate` 的阈值调优。
+
+选择互斥的典型理由：避免触控板/触摸屏的轻微距离变化被误判成 Pinch，或轻微角度变化被误判成 Rotate。
