@@ -128,3 +128,71 @@ void gio_call_ime_config(int hint) {
 void gio_call_ime_keyboard_status(int status) {
     GIO_HOST_CALL(ime_keyboard_status, status);
 }
+
+#define GIO_HOST3_CALL(fn, ...) do { \
+    if (gio_host_ready && gio_host_abi >= GIO_OHOS_ABI_VERSION && gio_host_v3.fn != NULL) { \
+        gio_host_v3.fn(gio_host_v3.v2.user, __VA_ARGS__); \
+    } \
+} while (0)
+
+#define GIO_HOST3_CALL0(fn) do { \
+    if (gio_host_ready && gio_host_abi >= GIO_OHOS_ABI_VERSION && gio_host_v3.fn != NULL) { \
+        gio_host_v3.fn(gio_host_v3.v2.user); \
+    } \
+} while (0)
+
+void gio_call_set_window_mode(int mode) {
+    GIO_HOST3_CALL(set_window_mode, mode);
+}
+
+void gio_call_set_title(const char *title) {
+    GIO_HOST3_CALL(set_title, title);
+}
+
+void gio_call_set_orientation(int orientation) {
+    GIO_HOST3_CALL(set_orientation, orientation);
+}
+
+void gio_call_set_status_color(uint32_t argb) {
+    GIO_HOST3_CALL(set_status_color, argb);
+}
+
+void gio_call_set_navigation_color(uint32_t argb) {
+    GIO_HOST3_CALL(set_navigation_color, argb);
+}
+
+void gio_call_set_top_most(int topmost) {
+    GIO_HOST3_CALL(set_top_most, topmost);
+}
+
+void gio_call_set_window_limits(int minw, int minh, int maxw, int maxh) {
+    GIO_HOST3_CALL(set_window_limits, minw, minh, maxw, maxh);
+}
+
+void gio_call_pick_file_ex(int mode, const char *mimes, int multiple) {
+    GIO_HOST3_CALL(pick_file_ex, mode, mimes, multiple);
+}
+
+int gio_call_request_close(void) {
+    if (gio_host_ready && gio_host_abi >= GIO_OHOS_ABI_VERSION && gio_host_v3.request_close != NULL) {
+        gio_host_v3.request_close(gio_host_v3.v2.user);
+        return 1;
+    }
+    return 0;
+}
+
+void gio_call_raise_window(void) {
+    GIO_HOST3_CALL0(raise_window);
+}
+
+void gio_call_center_window(void) {
+    GIO_HOST3_CALL0(center_window);
+}
+
+void gio_call_start_window_move(void) {
+    GIO_HOST3_CALL0(start_window_move);
+}
+
+void gio_call_set_animating(int animating) {
+    GIO_HOST3_CALL(set_animating, animating);
+}

@@ -14,6 +14,7 @@ import (
 	"gioui.org/io/event"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
+	"gioui.org/io/system"
 	"gioui.org/io/transfer"
 	"gioui.org/unit"
 )
@@ -71,6 +72,9 @@ const (
 	ohosEvPickError
 	ohosEvSetAnimating
 	ohosEvConfigure
+	ohosEvAction
+	ohosEvWindowMode
+	ohosEvOrientation
 )
 
 // ohosEvent is one platform callback, copied from C before it enters the
@@ -101,6 +105,8 @@ type ohosEvent struct {
 
 	// opts carries window options for ohosEvConfigure.
 	opts []Option
+	// sysAction carries a system.Action for ohosEvAction.
+	sysAction system.Action
 }
 
 // ohosSink receives the effects of the event pump.  The real implementation
@@ -125,6 +131,7 @@ type ohosSink interface {
 // (docs/ohos-backend.md).  All methods must be called from the single ohosLoop goroutine.
 type ohosPump struct {
 	sink   ohosSink
+	host   ohosHost
 	metric unit.Metric
 
 	config     Config
@@ -153,7 +160,7 @@ type ohosPump struct {
 	lastPinch     float32
 }
 
-func newOhosPump(sink ohosSink, metric unit.Metric) *ohosPump {
+func newOhosPump(sink ohosSink, host ohosHost, metric unit.Metric) *ohosPump {
 	if metric.PxPerDp <= 0 {
 		metric.PxPerDp = 1
 	}
@@ -162,6 +169,7 @@ func newOhosPump(sink ohosSink, metric unit.Metric) *ohosPump {
 	}
 	return &ohosPump{
 		sink:          sink,
+		host:          host,
 		metric:        metric,
 		life:          ohosForeground,
 		config:        Config{Decorated: true, Focused: true},
@@ -242,6 +250,12 @@ func (p *ohosPump) Handle(e ohosEvent) {
 		p.SetAnimating(e.anim)
 	case ohosEvConfigure:
 		p.Configure(e.opts)
+	case ohosEvAction:
+		p.handleAction(e.sysAction)
+	case ohosEvWindowMode:
+		p.setWindowMode(e.a)
+	case ohosEvOrientation:
+		p.setOrientation(e.a)
 	}
 }
 
@@ -317,6 +331,9 @@ func (p *ohosPump) SetAnimating(anim bool) {
 		return
 	}
 	p.animating = anim
+	if p.host != nil {
+		p.host.HostSetAnimating(anim)
+	}
 	if anim {
 		p.requestFrame()
 	}
@@ -567,8 +584,13 @@ func (p *ohosPump) clipboard(mime, text string) {
 // ApplyOptions records the initial window options without emitting an event.
 // newWindow must not deliver anything before the client starts reading.
 func (p *ohosPump) ApplyOptions(options []Option) {
+	old := p.config
 	p.config.apply(p.metric, options)
 	p.config.Decorated = true
+	p.config.Size = old.Size
+	if p.host != nil {
+		p.host.Apply(planOHOSConfig(old, p.config))
+	}
 }
 
 // Configure applies window options.  Decorations are always provided by the
@@ -581,7 +603,92 @@ func (p *ohosPump) Configure(options []Option) {
 	// the application, and letting an Option change it makes EGL use a
 	// geometry different from the XComponent.
 	cnf.Size = p.config.Size
+	old := p.config
 	p.config = cnf
+	p.applyConfigDelta(planOHOSConfig(old, cnf))
+}
+
+// applyConfigDelta pushes a delta to the platform, reports the effective
+// config and schedules a frame.
+func (p *ohosPump) applyConfigDelta(d ohosConfigDelta) {
+	if p.host != nil {
+		p.host.Apply(d)
+	}
 	p.sink.ohosDeliver(ConfigEvent{Config: p.config})
 	p.requestFrame()
+}
+
+func (p *ohosPump) handleAction(a system.Action) {
+	if a&system.ActionClose != 0 {
+		if p.host == nil || !p.host.RequestClose() {
+			p.Stop()
+		}
+		return
+	}
+	var d ohosConfigDelta
+	switch {
+	case a&system.ActionMinimize != 0:
+		d.ModeSet, d.Mode = true, Minimized
+	case a&system.ActionMaximize != 0:
+		d.ModeSet, d.Mode = true, Maximized
+	case a&system.ActionFullscreen != 0:
+		d.ModeSet, d.Mode = true, Fullscreen
+	case a&system.ActionUnmaximize != 0:
+		d.ModeSet, d.Mode = true, Windowed
+	}
+	if d.ModeSet {
+		p.config.Mode = d.Mode
+		p.applyConfigDelta(d)
+	}
+	if p.host != nil {
+		if a&system.ActionRaise != 0 {
+			p.host.RaiseWindow()
+		}
+		if a&system.ActionCenter != 0 {
+			p.host.CenterWindow()
+		}
+		if a&system.ActionMove != 0 {
+			p.host.StartWindowMove()
+		}
+	}
+}
+
+func (p *ohosPump) setWindowMode(mode int) {
+	var m WindowMode
+	switch mode {
+	case 0:
+		m = Windowed
+	case 1:
+		m = Fullscreen
+	case 2:
+		m = Minimized
+	case 3:
+		m = Maximized
+	default:
+		return
+	}
+	if p.config.Mode == m {
+		return
+	}
+	p.config.Mode = m
+	p.applyConfigDelta(ohosConfigDelta{ModeSet: true, Mode: m})
+}
+
+func (p *ohosPump) setOrientation(o int) {
+	var orientation Orientation
+	switch o {
+	case 0:
+		orientation = AnyOrientation
+	case 1:
+		orientation = LandscapeOrientation
+	case 2:
+		orientation = PortraitOrientation
+	default:
+		return
+	}
+	if p.config.Orientation == orientation {
+		return
+	}
+	p.config.Orientation = orientation
+	p.applyConfigDelta(ohosConfigDelta{OrientationSet: true, Orientation: orientation})
 }

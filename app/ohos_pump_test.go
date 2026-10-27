@@ -45,8 +45,14 @@ func (f *fakeSink) ohosPickError(mode int, msg string)     { f.pickErr = msg }
 func (f *fakeSink) ohosLog(msg string)                     { f.logs = append(f.logs, msg) }
 
 func newTestPump() (*ohosPump, *fakeSink) {
+	p, f, _ := newTestPumpWithHost()
+	return p, f
+}
+
+func newTestPumpWithHost() (*ohosPump, *fakeSink, *fakeHost) {
 	f := new(fakeSink)
-	return newOhosPump(f, unit.Metric{PxPerDp: 2, PxPerSp: 2}), f
+	h := new(fakeHost)
+	return newOhosPump(f, h, unit.Metric{PxPerDp: 2, PxPerSp: 2}), f, h
 }
 
 func TestOHOSKeyNames(t *testing.T) {

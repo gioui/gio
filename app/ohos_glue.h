@@ -104,6 +104,22 @@ void gio_call_ime_cursor(float x, float y, float width, float height);
 void gio_call_ime_config(int hint);
 void gio_call_ime_keyboard_status(int status);
 
+/* ABI 3 host calls. Missing entries are no-ops. */
+void gio_call_set_window_mode(int mode);
+void gio_call_set_title(const char *title);
+void gio_call_set_orientation(int orientation);
+void gio_call_set_status_color(uint32_t argb);
+void gio_call_set_navigation_color(uint32_t argb);
+void gio_call_set_top_most(int topmost);
+void gio_call_set_window_limits(int minw, int minh, int maxw, int maxh);
+void gio_call_pick_file_ex(int mode, const char *mimes, int multiple);
+/* Returns 1 when the shim implements request_close. */
+int gio_call_request_close(void);
+void gio_call_raise_window(void);
+void gio_call_center_window(void);
+void gio_call_start_window_move(void);
+void gio_call_set_animating(int animating);
+
 /* ---- Exported by Go (libgpofd.so) ----
  *
  * The shim calls these from the ArkUI/JS thread.  Every entry copies its

@@ -212,7 +212,7 @@ func newWindow(callbacks *callbacks, options []Option) {
 	if metric.PxPerSp <= 0 {
 		metric.PxPerSp = metric.PxPerDp
 	}
-	w.pump = newOhosPump(w, metric)
+	w.pump = newOhosPump(w, w, metric)
 	staging := ohosState.staging
 	ohosState.staging = nil
 	ohosState.win = w
@@ -285,6 +285,54 @@ func (w *window) Configure(options []Option) {
 	w.enqueue(ohosEvent{kind: ohosEvConfigure, opts: options})
 }
 
+// ---- ohosHost ----
+
+func (w *window) Apply(d ohosConfigDelta) {
+	if d.ModeSet {
+		C.gio_call_set_window_mode(C.int(ohosWindowMode(d.Mode)))
+	}
+	if d.TitleSet {
+		ct := C.CString(d.Title)
+		C.gio_call_set_title(ct)
+		C.free(unsafe.Pointer(ct))
+	}
+	if d.OrientationSet {
+		C.gio_call_set_orientation(C.int(ohosOrientation(d.Orientation)))
+	}
+	if d.StatusSet {
+		C.gio_call_set_status_color(C.uint32_t(ohosColor(d.Status)))
+	}
+	if d.NavigationSet {
+		C.gio_call_set_navigation_color(C.uint32_t(ohosColor(d.Navigation)))
+	}
+	if d.TopMostSet {
+		C.gio_call_set_top_most(boolInt(d.TopMost))
+	}
+	if d.LimitsSet {
+		C.gio_call_set_window_limits(C.int(d.Min.X), C.int(d.Min.Y), C.int(d.Max.X), C.int(d.Max.Y))
+	}
+}
+
+func (w *window) HostSetAnimating(anim bool) {
+	C.gio_call_set_animating(boolInt(anim))
+}
+
+func (w *window) RequestClose() bool {
+	return C.gio_call_request_close() != 0
+}
+
+func (w *window) RaiseWindow() {
+	C.gio_call_raise_window()
+}
+
+func (w *window) CenterWindow() {
+	C.gio_call_center_window()
+}
+
+func (w *window) StartWindowMove() {
+	C.gio_call_start_window_move()
+}
+
 func (w *window) SetCursor(cursor pointer.Cursor) {
 	if w.closed.Load() {
 		return
@@ -332,8 +380,8 @@ func (w *window) Perform(actions system.Action) {
 	if w.closed.Load() {
 		return
 	}
-	if actions&system.ActionClose != 0 {
-		w.enqueue(ohosEvent{kind: ohosEvLifecycle, life: ohosDestroyed})
+	if actions != 0 {
+		w.enqueue(ohosEvent{kind: ohosEvAction, sysAction: actions})
 	}
 }
 
@@ -636,6 +684,16 @@ func gio_ohos_clipboard(mime, text *C.char) {
 //export gio_ohos_lifecycle
 func gio_ohos_lifecycle(state C.int) {
 	enqueueOhos(ohosEvent{kind: ohosEvLifecycle, life: ohosLifecycle(state)})
+}
+
+//export gio_ohos_window_mode
+func gio_ohos_window_mode(mode C.int) {
+	enqueueOhos(ohosEvent{kind: ohosEvWindowMode, a: int(mode)})
+}
+
+//export gio_ohos_orientation
+func gio_ohos_orientation(orientation C.int) {
+	enqueueOhos(ohosEvent{kind: ohosEvOrientation, a: int(orientation)})
 }
 
 //export gio_ohos_log
