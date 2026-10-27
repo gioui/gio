@@ -22,6 +22,7 @@
 | `ddf79b37` | gesture.ZoomRotate 互斥仲裁器 |
 | `67344c58` | OHOS stale/重复触点恢复、两指手势隔离 |
 | `e756d245` | 测试程序日志区压缩 |
+| `8fe3f924` | Wayland 手势状态机 + host 测试、pointer.Capabilities |
 
 ### 已完成
 
@@ -33,7 +34,8 @@
 | WP2 Windows 来源/注册 | 完成 | PT_TOUCHPAD/PT_PEN/PT_TOUCH 分类；RegisterTouchpadCapableWindow |
 | WP2 Windows 触摸屏手势 | 完成 | WM_GESTURE zoom/rotate；GID_ROTATE 32768/圈换算；仅交叉编译+转换单测 |
 | WP3 macOS 语义手势 | 完成（代码 + 本机验收） | 2026-10-27 本机验证 pinch/rotate/scroll、左右键、双击、真实触点数；三指 Swipe 受系统“轻扫切换页面”设置影响 |
-| WP4 Wayland 语义手势 | 实现完成；协议绑定通过 | Fedora 44：`zwp_pointer_gestures_v1` v3，pinch/swipe/hold 对象创建成功；真实触控板 E2E 未完成 |
+| WP4 Wayland 语义手势 | 实现完成；协议绑定 + host 映射测试通过 | Fedora 44 完整构建（含 Vulkan）通过；pinch/swipe/hold Begin/Update/End/Cancel、Scale/Rotation/Swipe 累加有测试；真实触控板 E2E 未完成 |
+| P2 能力查询 | 完成 | `pointer.Capabilities` + `Window.Capabilities()`，macOS/Windows/Wayland/OHOS 已实现 |
 | WP5 OHOS 手势 | 核心完成 + 真机验收 | VYG-AL00 验证连续 pinch/rotate/swipe、单指/双击；Hold 未验；2in1 未验 |
 | 文档 | 完成 | 本文件 + [input-gestures-cross-platform.md](input-gestures-cross-platform.md) |
 
@@ -46,11 +48,11 @@
 | P1 | WP5 OHOS 收尾 | Hold 真机验收；2in1 触控板 rotate/swipe 验证；补接入文档；可选 ABI 导出 | 1–2 天；可选 3 天 shim | 需要 Hold/2in1 设备 |
 | P1 | WP6 Android/iOS | 原生 ScaleGestureDetector/UIGestureRecognizer 或后端接入 gesture 包；iPad 间接指针/hover | 4 天 | 需要 Android/iPad 设备 |
 | P2 | WP7 Web | Pointer Events 优先、wheel ctrl 回退、Safari GestureEvent、touch-action | 2 天 | 需要浏览器矩阵 |
-| P2 | WP8 仲裁/能力 | pointer.Capabilities；Windows 全局手势 opt-in；各平台系统手势说明；避免原生+回退双触发 | 3 天 | 需先完成平台接入 |
+| P2 | WP8 仲裁/能力 | 能力查询已完成；Windows 全局手势 opt-in、系统手势说明、避免原生+回退双触发 | 2 天 | 需先完成平台接入 |
 | P2 | WP9 测试/CI | 后端事件 golden trace；真机矩阵；CI 手势测试；模拟器 GPU shader 兼容 | 3–4 天 | 依赖设备/模拟器 |
 | P3 | M4 长尾 | Pen 压力/倾斜、原始触控板帧、触觉 | 1–2 周 | 单独立项 |
 
-**剩余合计**：约 17 Go 人日（含 Wayland/OHOS 验收）+ 可选 3 天 shim；单人含缓冲约 4 周，双人约 2.5 周。
+**剩余合计**：约 16 Go 人日（含 Wayland/OHOS 验收）+ 可选 3 天 shim；单人含缓冲约 4 周，双人约 2.5 周。
 
 ### 建议执行顺序
 
@@ -75,6 +77,7 @@
 | 新增语义手势真机验收 | **macOS、OHOS VYG-AL00 通过**；Windows 仍待设备验收 |
 | Wayland 构建/协议绑定 | Fedora 44 `go build -tags novulkan` 通过；manager/pinch/swipe/hold 对象创建成功 |
 | Wayland 手势 E2E | **未完成**：虚拟触控板被 libinput jump detector 丢弃，需真实 USB 触控板 |
+| P2 `pointer.Capabilities` | 通过，含单测 |
 | OHOS 模拟器 | 安装成功，但 GPU shader 初始化崩溃（`version '450' is not supported`） |
 
 ---
