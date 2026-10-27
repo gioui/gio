@@ -204,3 +204,11 @@ void gio_call_start_window_move(void) {
 void gio_call_set_animating(int animating) {
     GIO_HOST3_CALL(set_animating, animating);
 }
+
+void gio_call_semantics_update(const char *json, int length) {
+    GIO_HOST3_CALL(semantics_update, json, length);
+}
+
+void gio_call_semantics_announce(const char *text) {
+    GIO_HOST3_CALL(semantics_announce, text);
+}

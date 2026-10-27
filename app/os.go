@@ -214,6 +214,12 @@ type driver interface {
 	ProcessEvent(e event.Event)
 }
 
+// semanticsDriver is implemented by backends that publish the semantic tree
+// to the platform accessibility service.
+type semanticsDriver interface {
+	SemanticsChanged()
+}
+
 type windowRendezvous struct {
 	in      chan windowAndConfig
 	out     chan windowAndConfig

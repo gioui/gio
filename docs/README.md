@@ -19,6 +19,7 @@
 | [ohos-abi.md](ohos-abi.md) | OHOS C ABI v1/v2/v3：结构、尺寸协商、单位、线程与能力探测 | shim 开发者 |
 | [ohos-shim.md](ohos-shim.md) | OHOS shim 契约：生命周期、帧、IME、输入、文件、无障碍 | shim 开发者 |
 | [ohos-testing.md](ohos-testing.md) | OHOS 测试指南：host/ABI/交叉编译/真机矩阵 | 开发者、QA |
+| [ohos-a11y.md](ohos-a11y.md) | OHOS 无障碍最小闭环：语义 JSON、动作、播报与平台限制 | shim 开发者、QA |
 
 **推荐阅读顺序**：本页 → `architecture.md` → `risks-and-optimizations.md` → 按需查 `module-reference.md` / `ohos-backend.md` → 若维护 OHOS，继续读 `ohos-remediation-plan.md` → `ohos-stage-plan.md` → `verification.md` 复核。
 

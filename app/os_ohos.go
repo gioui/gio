@@ -23,7 +23,9 @@ import (
 	"sync/atomic"
 	"unsafe"
 
+	"gioui.org/f32"
 	"gioui.org/io/event"
+	"gioui.org/io/input"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
@@ -456,6 +458,69 @@ func (w *window) ohosPickError(mode int, msg string) {
 
 func (w *window) ohosLog(msg string) {
 	ohosDebugf("log:"+msg, "%s", msg)
+}
+
+// SemanticsChanged publishes the changed part of the semantic tree. On the
+// first frame the whole tree is sent so the shim has a baseline.
+func (w *window) SemanticsChanged() {
+	if w.closed.Load() {
+		return
+	}
+	root := w.callbacks.SemanticRoot()
+	diffs := w.callbacks.AppendSemanticDiffs(nil)
+	first := len(w.callbacks.w.semantic.prevTree) == 0
+	if len(diffs) == 0 && !first {
+		return
+	}
+	var nodes []input.SemanticNode
+	var removed []input.SemanticID
+	if first {
+		if n, ok := w.callbacks.LookupSemantic(root); ok {
+			nodes = appendOHOSSemanticNodes(nodes, n)
+		}
+	} else {
+		for _, id := range diffs {
+			if n, ok := w.callbacks.LookupSemantic(id); ok {
+				nodes = append(nodes, n)
+			} else {
+				removed = append(removed, id)
+			}
+		}
+	}
+	if len(nodes) == 0 && len(removed) == 0 {
+		return
+	}
+	b := ohosSemanticsJSON(root, nodes, removed)
+	if len(b) == 0 {
+		return
+	}
+	C.gio_call_semantics_update((*C.char)(unsafe.Pointer(&b[0])), C.int(len(b)))
+}
+
+// ohosSemanticAction synthesizes a pointer gesture for an accessibility
+// action: 0 click, 1 scroll forward, 2 scroll backward.
+func (w *window) ohosSemanticAction(id, action int) {
+	if w.closed.Load() {
+		return
+	}
+	node, ok := w.callbacks.LookupSemantic(input.SemanticID(id))
+	if !ok {
+		return
+	}
+	b := node.Desc.Bounds
+	center := b.Min.Add(b.Size().Div(2))
+	pos := f32.Pt(float32(center.X), float32(center.Y))
+	switch action {
+	case 0:
+		w.deliver(pointer.Event{Kind: pointer.Press, Source: pointer.Touch, PointerID: 1, Position: pos})
+		w.deliver(pointer.Event{Kind: pointer.Release, Source: pointer.Touch, PointerID: 1, Position: pos})
+	case 1, 2:
+		dy := float32(b.Dy()) / 2
+		if action == 2 {
+			dy = -dy
+		}
+		w.deliver(pointer.Event{Kind: pointer.Scroll, Source: pointer.Mouse, PointerID: 1, Position: pos, Scroll: f32.Pt(0, dy)})
+	}
 }
 
 // updateIME reports the surrounding text, selection and caret rectangle to

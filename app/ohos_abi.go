@@ -162,6 +162,11 @@ func gio_ohos_drop(uris *C.char) {
 	enqueueOhos(ohosEvent{kind: ohosEvDrop, text: cString(uris)})
 }
 
+//export gio_ohos_semantic_action
+func gio_ohos_semantic_action(nodeID, action C.int) {
+	enqueueOhos(ohosEvent{kind: ohosEvSemanticAction, a: int(nodeID), b: int(action)})
+}
+
 //export gio_ohos_lifecycle
 func gio_ohos_lifecycle(state C.int) {
 	enqueueOhos(ohosEvent{kind: ohosEvLifecycle, life: ohosLifecycle(state)})
@@ -289,6 +294,13 @@ func OHOSPickFileWithOptions(mode int, mimes []string, multiple bool) {
 	cmimes := C.CString(strings.Join(mimes, ","))
 	defer C.free(unsafe.Pointer(cmimes))
 	C.gio_call_pick_file_ex(C.int(mode), cmimes, boolInt(multiple))
+}
+
+// OHOSAnnounce asks the platform accessibility service to announce text.
+func OHOSAnnounce(text string) {
+	ctext := C.CString(text)
+	defer C.free(unsafe.Pointer(ctext))
+	C.gio_call_semantics_announce(ctext)
 }
 
 // OHOSLog forwards a message to hilog through the shim.

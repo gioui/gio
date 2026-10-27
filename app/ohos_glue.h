@@ -124,6 +124,8 @@ void gio_call_raise_window(void);
 void gio_call_center_window(void);
 void gio_call_start_window_move(void);
 void gio_call_set_animating(int animating);
+void gio_call_semantics_update(const char *json, int length);
+void gio_call_semantics_announce(const char *text);
 
 /* ---- Exported by Go (libgpofd.so) ----
  *
@@ -174,6 +176,7 @@ void gio_ohos_orientation(int orientation); /* 0 any 1 landscape 2 portrait */
 void gio_ohos_density(float density, float fontScale);
 void gio_ohos_drop(char *uris_json);            /* JSON array of absolute paths */
 void gio_ohos_clipboard_data(char *mime, void *data, int length);
+void gio_ohos_semantic_action(int nodeID, int action); /* 0 click 1 scroll forward 2 backward */
 
 #ifdef __cplusplus
 }

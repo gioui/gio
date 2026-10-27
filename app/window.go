@@ -246,6 +246,9 @@ func (w *Window) processFrame(frame *op.Ops, ack chan<- struct{}) {
 	}
 	w.updateState()
 	w.updateCursor()
+	if d, ok := w.driver.(semanticsDriver); ok {
+		d.SemanticsChanged()
+	}
 }
 
 func (w *Window) updateState() {

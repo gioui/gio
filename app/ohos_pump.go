@@ -80,6 +80,7 @@ const (
 	ohosEvMetric
 	ohosEvDrop
 	ohosEvClipboardData
+	ohosEvSemanticAction
 )
 
 // ohosEvent is one platform callback, copied from C before it enters the
@@ -132,6 +133,7 @@ type ohosSink interface {
 	ohosIMEChanged()
 	ohosPickResult(mode int, uris []string)
 	ohosPickError(mode int, msg string)
+	ohosSemanticAction(id, action int)
 	ohosLog(msg string)
 }
 
@@ -283,6 +285,8 @@ func (p *ohosPump) Handle(e ohosEvent) {
 		p.SetMetric(e.metric)
 	case ohosEvDrop:
 		p.drop(e.text)
+	case ohosEvSemanticAction:
+		p.sink.ohosSemanticAction(e.a, e.b)
 	}
 }
 
