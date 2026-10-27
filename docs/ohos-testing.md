@@ -80,4 +80,4 @@ go build -tags gio_ohos ./app
 | `script/test-ohos-abi.sh` | 通过 |
 | `script/check-ohos-tags.sh` | 通过 |
 | OHOS arm64 交叉编译 | 通过 |
-| 真机 Gate | **未执行**（无设备/shim） |
+| 真机 Gate | **部分执行**：VYG-AL00 启动/输入/文件选择器/ABI v4 通过；见 [ohos-device-2026-10-27.md](ohos-device-2026-10-27.md) |

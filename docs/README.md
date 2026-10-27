@@ -21,6 +21,7 @@
 | [ohos-testing.md](ohos-testing.md) | OHOS 测试指南：host/ABI/交叉编译/真机矩阵 | 开发者、QA |
 | [ohos-a11y.md](ohos-a11y.md) | OHOS 无障碍最小闭环：语义 JSON、动作、播报与平台限制 | shim 开发者、QA |
 | [ohos-gate-m2.md](ohos-gate-m2.md) | S0–S10 Gate 报告：提交、证据、基准、真机待办与回滚 | 项目执行者、QA |
+| [ohos-device-2026-10-27.md](ohos-device-2026-10-27.md) | 2026-10-27 真机验证：VYG-AL00、ABI v4、启动/输入/文件选择器 | 开发者、QA |
 
 **推荐阅读顺序**：本页 → `architecture.md` → `risks-and-optimizations.md` → 按需查 `module-reference.md` / `ohos-backend.md` → 若维护 OHOS，继续读 `ohos-remediation-plan.md` → `ohos-stage-plan.md` → `verification.md` 复核。
 
