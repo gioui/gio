@@ -24,8 +24,10 @@ GOROOT=/opt/homebrew/Cellar/go/1.27.1/libexec \
 | 双指捏合/张开 | Pinch 计数增加；Last 显示 `Pinch Trackpad Begin/Update/End`；Scale 从 1 连续变化 |
 | 双指旋转 | Rotate 计数增加；Rotation 为弧度，符号稳定 |
 | 双指滚动 | Scroll 计数增加；Source 通常为 Mouse（当前 Wayland/OHOS 尚未区分 Trackpad） |
-| 三指滑动 | Swipe 计数增加（取决于系统是否把该手势交给应用；macOS 三指手势常被 Mission Control 占用） |
+| 三指滑动 | Swipe 计数增加（取决于系统是否把该手势交给应用；macOS 三指手势常被 Mission Control 占用，可能表现为 Scroll） |
 | 长按/多指按住 | Hold 计数增加（当前仅 gesture 回退包支持；macOS 后端尚未合成 Hold） |
+| 左/右键点击 | Press 的 Buttons 分别显示 ButtonPrimary/ButtonSecondary |
+| 双击 | Double 计数增加（测试程序按 300ms/10px 自行识别） |
 | Reset | 清空计数与日志 |
 
 ## 显示字段
@@ -36,7 +38,8 @@ GOROOT=/opt/homebrew/Cellar/go/1.27.1/libexec \
 - Scale：相对 begin 的绝对值，1 表示无变化
 - Rotation：相对 begin 的累计弧度
 - Swipe：相对 begin 的逻辑中心位移
-- Fingers：参与手指数
+- Fingers：参与手指数；macOS 精确触控板滚动为 2，鼠标滚轮为 0
+- Buttons：当前按下的鼠标键
 - Position/PointerID/GestureID/Time
 
 ## 平台现状
@@ -57,3 +60,8 @@ GOROOT=/opt/homebrew/Cellar/go/1.27.1/libexec \
 - 触摸屏平台需要按窗口区域接入回退识别器，属于应用层策略。
 
 如果要在触摸屏上验证回退识别，可参考 `gesture.Pinch`、`gesture.Rotate`、`gesture.Swipe`、`gesture.Hold` 的 host 测试。
+
+### macOS 三指手势说明
+
+macOS 可能把三指滑动识别成系统手势（Mission Control/切换桌面）或滚动，而不是 `swipeWithEvent`。可在
+系统设置 → 触控板 → 更多手势中检查“在页面之间轻扫”和“三指拖移”等设置；这不是 Gio 能强制覆盖的。

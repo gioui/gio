@@ -11,8 +11,10 @@ import (
 	"image/color"
 	"log"
 	"os"
+	"time"
 
 	"gioui.org/app"
+	"gioui.org/f32"
 	"gioui.org/io/event"
 	"gioui.org/io/pointer"
 	"gioui.org/layout"
@@ -37,6 +39,12 @@ type appState struct {
 	last   pointer.Event
 	has    bool
 	counts map[pointer.Kind]int
+
+	clicks       int
+	doubleClicks int
+	lastPress    time.Duration
+	lastPressPos f32.Point
+	lastPressBtn pointer.Buttons
 }
 
 func main() {
@@ -116,6 +124,9 @@ func (a *appState) counterRow(gtx layout.Context) layout.Dimensions {
 		a.counts = make(map[pointer.Kind]int)
 		a.events = nil
 		a.has = false
+		a.clicks = 0
+		a.doubleClicks = 0
+		a.lastPress = 0
 	}
 	return layout.Flex{Axis: layout.Horizontal, Alignment: layout.Middle}.Layout(gtx,
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
@@ -123,9 +134,10 @@ func (a *appState) counterRow(gtx layout.Context) layout.Dimensions {
 		}),
 		layout.Rigid(layout.Spacer{Width: unit.Dp(16)}.Layout),
 		layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
-			txt := fmt.Sprintf("Pinch %d  Rotate %d  Swipe %d  Hold %d  Scroll %d  Press %d",
+			txt := fmt.Sprintf("Pinch %d  Rotate %d  Swipe %d  Hold %d  Scroll %d  Press %d  Clicks %d  Double %d",
 				a.counts[pointer.Pinch], a.counts[pointer.Rotate], a.counts[pointer.Swipe],
-				a.counts[pointer.Hold], a.counts[pointer.Scroll], a.counts[pointer.Press])
+				a.counts[pointer.Hold], a.counts[pointer.Scroll], a.counts[pointer.Press],
+				a.clicks, a.doubleClicks)
 			return material.Body2(a.theme, txt).Layout(gtx)
 		}),
 	)
@@ -156,12 +168,30 @@ func (a *appState) record(e pointer.Event) {
 	a.last = e
 	a.has = true
 	a.counts[e.Kind]++
+	if e.Kind == pointer.Press {
+		a.clicks++
+		if a.lastPress != 0 && e.Time-a.lastPress < 300*time.Millisecond {
+			dx, dy := e.Position.X-a.lastPressPos.X, e.Position.Y-a.lastPressPos.Y
+			if dx*dx+dy*dy < 100 && e.Buttons == a.lastPressBtn {
+				a.doubleClicks++
+				a.lastPress = 0
+			} else {
+				a.lastPress = e.Time
+				a.lastPressPos = e.Position
+				a.lastPressBtn = e.Buttons
+			}
+		} else {
+			a.lastPress = e.Time
+			a.lastPressPos = e.Position
+			a.lastPressBtn = e.Buttons
+		}
+	}
 	a.events = append(a.events, e)
 	if len(a.events) > history {
 		a.events = a.events[len(a.events)-history:]
 	}
-	log.Printf("gesture kind=%v source=%v phase=%v scale=%.4f rotation=%.4f swipe=%v fingers=%d pos=%v id=%d",
-		e.Kind, e.Source, phaseLabel(e), e.Scale, e.Rotation, e.Swipe, e.Fingers, e.Position, e.GestureID)
+	log.Printf("gesture kind=%v source=%v phase=%v buttons=%v scale=%.4f rotation=%.4f swipe=%v fingers=%d pos=%v id=%d",
+		e.Kind, e.Source, phaseLabel(e), e.Buttons, e.Scale, e.Rotation, e.Swipe, e.Fingers, e.Position, e.GestureID)
 }
 
 func (a *appState) details(gtx layout.Context) layout.Dimensions {
@@ -172,7 +202,7 @@ func (a *appState) details(gtx layout.Context) layout.Dimensions {
 	lines := []string{
 		fmt.Sprintf("Last: %v  source=%v  phase=%v", e.Kind, e.Source, phaseLabel(e)),
 		fmt.Sprintf("scale=%.4f  rotation=%.4f rad  swipe=%v  fingers=%d", e.Scale, e.Rotation, e.Swipe, e.Fingers),
-		fmt.Sprintf("position=%v  pointerID=%d  gestureID=%d  time=%v", e.Position, e.PointerID, e.GestureID, e.Time),
+		fmt.Sprintf("position=%v  pointerID=%d  gestureID=%d  time=%v  buttons=%v", e.Position, e.PointerID, e.GestureID, e.Time, e.Buttons),
 	}
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
@@ -191,13 +221,20 @@ func (a *appState) log(gtx layout.Context) layout.Dimensions {
 	children := make([]layout.FlexChild, 0, len(a.events))
 	for i := len(a.events) - 1; i >= 0; i-- {
 		e := a.events[i]
-		txt := fmt.Sprintf("%v %-8v %-9v scale=%.3f rot=%.3f swipe=%v fingers=%d",
-			e.Kind, e.Source, phaseLabel(e), e.Scale, e.Rotation, e.Swipe, e.Fingers)
+		txt := fmt.Sprintf("%v %-8v %-9v buttons=%-9v scale=%.3f rot=%.3f swipe=%v fingers=%d",
+			e.Kind, e.Source, phaseLabel(e), buttonsString(e.Buttons), e.Scale, e.Rotation, e.Swipe, e.Fingers)
 		children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 			return material.Caption(a.theme, txt).Layout(gtx)
 		}))
 	}
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx, children...)
+}
+
+func buttonsString(b pointer.Buttons) string {
+	if b == 0 {
+		return "-"
+	}
+	return b.String()
 }
 
 func isGestureKind(k pointer.Kind) bool {
