@@ -5,7 +5,14 @@
 ## 运行
 
 ```bash
-go run ./cmd/gesture-test
+./cmd/gesture-test/run.sh
+```
+
+如果直接 `go run` 报 `compile: version "go1.27.1" does not match go tool version "go1.24.5"`，说明 shell 的 `go` 与 `GOROOT` 不一致（本机 `~/Public/ohos_golang_go` 是 1.24.5，`.bash_profile` 的 `GOROOT` 指向 1.27.1）。用上面的脚本，或显式指定：
+
+```bash
+GOROOT=/opt/homebrew/Cellar/go/1.27.1/libexec \
+  /opt/homebrew/Cellar/go/1.27.1/libexec/bin/go run ./cmd/gesture-test
 ```
 
 窗口打开后，把指针移到中间面板，按下面清单操作。
