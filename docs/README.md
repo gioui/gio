@@ -16,6 +16,9 @@
 | [ohos-backend.md](ohos-backend.md) | 本 fork 的 OHOS 后端专项：架构、功能矩阵、风险、未提交改动 | 维护 OHOS 分支的人 |
 | [ohos-remediation-plan.md](ohos-remediation-plan.md) | OHOS 能力补齐方案：ABI v3、生命周期/帧/IME/窗口/文件/无障碍，含工作包与排期 | OHOS 维护者、shim 开发者 |
 | [ohos-stage-plan.md](ohos-stage-plan.md) | OHOS 阶段执行计划：S0–S11、Gate、PR 切片、日期、证据与停止线 | 项目执行者、QA |
+| [ohos-abi.md](ohos-abi.md) | OHOS C ABI v1/v2/v3：结构、尺寸协商、单位、线程与能力探测 | shim 开发者 |
+| [ohos-shim.md](ohos-shim.md) | OHOS shim 契约：生命周期、帧、IME、输入、文件、无障碍 | shim 开发者 |
+| [ohos-testing.md](ohos-testing.md) | OHOS 测试指南：host/ABI/交叉编译/真机矩阵 | 开发者、QA |
 
 **推荐阅读顺序**：本页 → `architecture.md` → `risks-and-optimizations.md` → 按需查 `module-reference.md` / `ohos-backend.md` → 若维护 OHOS，继续读 `ohos-remediation-plan.md` → `ohos-stage-plan.md` → `verification.md` 复核。
 

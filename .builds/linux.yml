@@ -73,6 +73,11 @@ tasks:
      CGO_ENABLED=1 GOARCH=386 go test ./...
      GOOS=windows go test -exec=wine ./...
      GOOS=js GOARCH=wasm go build -o /dev/null ./...
+ - test_gio_ohos: |
+     cd gio
+     go test -tags gio_ohos_test ./app
+     ./script/check-ohos-tags.sh
+     ./script/test-ohos-abi.sh
  - install_jdk8: |
      curl -so jdk.deb "https://cdn.azul.com/zulu/bin/zulu8.42.0.21-ca-jdk8.0.232-linux_amd64.deb"
      sudo apt-get -qq install -y -f ./jdk.deb
