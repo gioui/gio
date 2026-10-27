@@ -70,7 +70,15 @@
 - `semantics_announce(text)`：播报。
 - `gio_ohos_semantic_action(id,action)`：读屏触发点击/滚动。
 
-## 9. 降级
+## 9. 多窗口（ABI 4）
+
+- 安装 v4 host 表后，Go 会调用 `create_window(id)` 创建一个窗口；shim 创建/绑定 XComponent。
+- 之后所有窗口相关调用前，Go 调 `select_window(id)`；shim 记住当前窗口。
+- 销毁时调 `destroy_window(id)`。
+- 输入/生命周期/IME 使用带 `_w(id, ...)` 后缀的导出；旧的无后缀入口只路由到默认窗口。
+- `create_window/select_window/destroy_window` 为 NULL 时退回单窗口：旧入口 + 默认窗口。
+
+## 10. 降级
 
 - 未实现的能力保持 NULL；Go 只警告一次。
 - 不得因为缺少可选回调而崩溃或阻塞。

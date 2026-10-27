@@ -2,7 +2,7 @@
 
 > 本文描述 Gio OHOS 后端（`libgpofd.so`）与 ArkTS/napi shim（`libgpofdohos.so`）之间的二进制契约。
 > 代码位置：[app/ohos_glue.h](../app/ohos_glue.h)、[app/ohos_glue.c](../app/ohos_glue.c)、[app/ohos_abi.go](../app/ohos_abi.go)。
-> 当前 Go 侧 `GIO_OHOS_ABI_VERSION = 3`。
+> 当前 Go 侧 `GIO_OHOS_ABI_VERSION = 4`。
 
 ---
 
@@ -23,6 +23,7 @@ Go libgpofd.so  ◀── gio_ohos_host(_v3)（函数表，Go 调用） ──  
 | v1 | `gio_ohos_install_host` | 14 个基础导出；7 个 host 回调 |
 | v2 | `gio_ohos_install_host` | 追加 mouse/frame/insets/IME/pick；host 结构 11 个回调 |
 | v3 | `gio_ohos_install_host_v3(host, size)` | 独立 `gio_ohos_host_v3`：窗口管理、剪贴板二进制、语义、动画、picker ex |
+| v4 | `gio_ohos_install_host_v4(host, size)` | 独立 `gio_ohos_host_v4`：select/create/destroy window + 全部 `_w` 事件 |
 
 **兼容规则**
 
@@ -54,6 +55,13 @@ typedef struct gio_ohos_host_v3 {
     void (*semantics_announce)(void*, const char *text);
     void (*set_animating)(void*, int);
 } gio_ohos_host_v3;
+
+typedef struct gio_ohos_host_v4 {
+    gio_ohos_host_v3 v3;              /* 必须位于首位 */
+    void (*select_window)(void*, uint64_t windowID);
+    void (*create_window)(void*, uint64_t windowID);
+    void (*destroy_window)(void*, uint64_t windowID);
+} gio_ohos_host_v4;
 ```
 
 ## 4. 关键约定
@@ -89,4 +97,4 @@ int host = gio_ohos_host_abi_version(); // 已安装 shim 的版本
 | 运行时权限 | 已实现（request_permission/result） | 待实现 |
 | 特性开关 | SYNC_FRAME / NO_A11Y 已实现；IME_LEGACY 未实现 | — |
 | 无障碍 | 待实现（S10） | 待评估 ArkUI 虚拟节点 |
-| 多窗口 | 未支持 | 未支持 |
+| 多窗口 | Go 侧路由/ABI v4 已就绪；shim 需实现 create/select/destroy 与 `_w` 事件 | 待实现 |

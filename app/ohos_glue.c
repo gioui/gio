@@ -31,7 +31,8 @@ void gio_ohos_set_buffer_format(void *window, int format) {
 }
 #endif
 
-static gio_ohos_host_v3 gio_host_v3;
+static gio_ohos_host_v4 gio_host_v4;
+#define gio_host_v3 (gio_host_v4.v3)
 static int gio_host_ready;
 static int gio_host_abi;
 
@@ -50,6 +51,21 @@ void gio_ohos_store_host(const gio_ohos_host *host) {
     gio_host_abi = GIO_OHOS_ABI2_VERSION;
 }
 
+void gio_ohos_store_host_v4(const gio_ohos_host_v4 *host, size_t size) {
+    memset(&gio_host_v4, 0, sizeof(gio_host_v4));
+    if (host == NULL || size == 0) {
+        gio_host_ready = 0;
+        gio_host_abi = 0;
+        return;
+    }
+    size_t n = size < sizeof(gio_host_v4) ? size : sizeof(gio_host_v4);
+    memcpy(&gio_host_v4, host, n);
+    gio_host_ready = 1;
+    gio_host_abi = n > offsetof(gio_ohos_host_v4, select_window)
+                       ? GIO_OHOS_ABI_VERSION
+                       : GIO_OHOS_ABI3_VERSION;
+}
+
 void gio_ohos_store_host_v3(const gio_ohos_host_v3 *host, size_t size) {
     memset(&gio_host_v3, 0, sizeof(gio_host_v3));
     if (host == NULL || size == 0) {
@@ -61,7 +77,7 @@ void gio_ohos_store_host_v3(const gio_ohos_host_v3 *host, size_t size) {
     memcpy(&gio_host_v3, host, n);
     gio_host_ready = 1;
     gio_host_abi = n > offsetof(gio_ohos_host_v3, set_window_mode)
-                       ? GIO_OHOS_ABI_VERSION
+                       ? GIO_OHOS_ABI3_VERSION
                        : GIO_OHOS_ABI2_VERSION;
 }
 
@@ -71,6 +87,24 @@ int gio_ohos_host_ready(void) {
 
 int gio_ohos_host_abi_version(void) {
     return gio_host_abi;
+}
+
+void gio_call_select_window(uint64_t windowID) {
+    if (gio_host_ready && gio_host_abi >= GIO_OHOS_ABI_VERSION && gio_host_v4.select_window != NULL) {
+        gio_host_v4.select_window(gio_host_v4.v3.v2.user, windowID);
+    }
+}
+
+void gio_call_create_window(uint64_t windowID) {
+    if (gio_host_ready && gio_host_abi >= GIO_OHOS_ABI_VERSION && gio_host_v4.create_window != NULL) {
+        gio_host_v4.create_window(gio_host_v4.v3.v2.user, windowID);
+    }
+}
+
+void gio_call_destroy_window(uint64_t windowID) {
+    if (gio_host_ready && gio_host_abi >= GIO_OHOS_ABI_VERSION && gio_host_v4.destroy_window != NULL) {
+        gio_host_v4.destroy_window(gio_host_v4.v3.v2.user, windowID);
+    }
 }
 
 #define GIO_HOST_CALL(fn, ...) do { \
@@ -94,7 +128,7 @@ void gio_call_set_clipboard(const char *mime, const char *text) {
 }
 
 int gio_call_set_clipboard_data(const char *mime, const void *data, int length) {
-    if (gio_host_ready && gio_host_abi >= GIO_OHOS_ABI_VERSION && gio_host_v3.set_clipboard_data != NULL) {
+    if (gio_host_ready && gio_host_abi >= GIO_OHOS_ABI3_VERSION && gio_host_v3.set_clipboard_data != NULL) {
         gio_host_v3.set_clipboard_data(gio_host_v3.v2.user, mime, data, length);
         return 1;
     }
@@ -138,13 +172,13 @@ void gio_call_ime_keyboard_status(int status) {
 }
 
 #define GIO_HOST3_CALL(fn, ...) do { \
-    if (gio_host_ready && gio_host_abi >= GIO_OHOS_ABI_VERSION && gio_host_v3.fn != NULL) { \
+    if (gio_host_ready && gio_host_abi >= GIO_OHOS_ABI3_VERSION && gio_host_v3.fn != NULL) { \
         gio_host_v3.fn(gio_host_v3.v2.user, __VA_ARGS__); \
     } \
 } while (0)
 
 #define GIO_HOST3_CALL0(fn) do { \
-    if (gio_host_ready && gio_host_abi >= GIO_OHOS_ABI_VERSION && gio_host_v3.fn != NULL) { \
+    if (gio_host_ready && gio_host_abi >= GIO_OHOS_ABI3_VERSION && gio_host_v3.fn != NULL) { \
         gio_host_v3.fn(gio_host_v3.v2.user); \
     } \
 } while (0)
@@ -182,7 +216,7 @@ void gio_call_pick_file_ex(int mode, const char *mimes, int multiple) {
 }
 
 int gio_call_request_permission(const char *name, int requestID) {
-    if (gio_host_ready && gio_host_abi >= GIO_OHOS_ABI_VERSION && gio_host_v3.request_permission != NULL) {
+    if (gio_host_ready && gio_host_abi >= GIO_OHOS_ABI3_VERSION && gio_host_v3.request_permission != NULL) {
         gio_host_v3.request_permission(gio_host_v3.v2.user, name, requestID);
         return 1;
     }
@@ -190,7 +224,7 @@ int gio_call_request_permission(const char *name, int requestID) {
 }
 
 int gio_call_request_close(void) {
-    if (gio_host_ready && gio_host_abi >= GIO_OHOS_ABI_VERSION && gio_host_v3.request_close != NULL) {
+    if (gio_host_ready && gio_host_abi >= GIO_OHOS_ABI3_VERSION && gio_host_v3.request_close != NULL) {
         gio_host_v3.request_close(gio_host_v3.v2.user);
         return 1;
     }

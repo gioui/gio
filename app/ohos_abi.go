@@ -32,6 +32,11 @@ func gio_ohos_install_host_v3(host *C.gio_ohos_host_v3, size C.size_t) {
 	C.gio_ohos_store_host_v3(host, size)
 }
 
+//export gio_ohos_install_host_v4
+func gio_ohos_install_host_v4(host *C.gio_ohos_host_v4, size C.size_t) {
+	C.gio_ohos_store_host_v4(host, size)
+}
+
 //export gio_ohos_abi_version
 func gio_ohos_abi_version() C.int {
 	return C.GIO_OHOS_ABI_VERSION
@@ -67,6 +72,133 @@ func gio_ohos_density(density, fontScale C.float) {
 	ohosApplyMetric(ohosMetric(float32(density), float32(fontScale)))
 }
 
+// ---- ABI 4 window-scoped events ----
+
+//export gio_ohos_surface_created_w
+func gio_ohos_surface_created_w(id C.uint64_t, win unsafe.Pointer, width, height C.int) {
+	enqueueOhosFor(uint64(id), ohosEvent{kind: ohosEvSurfaceCreated, win: uintptr(win), w: int(width), h: int(height)})
+}
+
+//export gio_ohos_surface_changed_w
+func gio_ohos_surface_changed_w(id C.uint64_t, win unsafe.Pointer, width, height C.int) {
+	enqueueOhosFor(uint64(id), ohosEvent{kind: ohosEvSurfaceChanged, win: uintptr(win), w: int(width), h: int(height)})
+}
+
+//export gio_ohos_surface_destroyed_w
+func gio_ohos_surface_destroyed_w(id C.uint64_t) {
+	enqueueOhosFor(uint64(id), ohosEvent{kind: ohosEvSurfaceDestroyed})
+}
+
+//export gio_ohos_touch_w
+func gio_ohos_touch_w(id C.uint64_t, action, pointerID C.int, x, y C.float, mods C.int) {
+	enqueueOhosFor(uint64(id), ohosEvent{kind: ohosEvTouch, action: int(action), id: int(pointerID), x: float32(x), y: float32(y), mods: int(mods)})
+}
+
+//export gio_ohos_mouse_w
+func gio_ohos_mouse_w(id C.uint64_t, action, button C.int, x, y C.float, mods C.int) {
+	enqueueOhosFor(uint64(id), ohosEvent{kind: ohosEvMouse, action: int(action), code: int(button), x: float32(x), y: float32(y), mods: int(mods)})
+}
+
+//export gio_ohos_axis_w
+func gio_ohos_axis_w(id C.uint64_t, x, y, dx, dy C.float, mods C.int) {
+	enqueueOhosFor(uint64(id), ohosEvent{kind: ohosEvAxis, x: float32(x), y: float32(y), dx: float32(dx), dy: float32(dy), mods: int(mods)})
+}
+
+//export gio_ohos_pinch_w
+func gio_ohos_pinch_w(id C.uint64_t, x, y, scale C.float, mods C.int) {
+	enqueueOhosFor(uint64(id), ohosEvent{kind: ohosEvAxis, x: float32(x), y: float32(y), scale: float32(scale), mods: int(mods)})
+}
+
+//export gio_ohos_key_w
+func gio_ohos_key_w(id C.uint64_t, code, action, mods C.int) {
+	enqueueOhosFor(uint64(id), ohosEvent{kind: ohosEvKey, code: int(code), action: int(action), mods: int(mods)})
+}
+
+//export gio_ohos_text_w
+func gio_ohos_text_w(id C.uint64_t, utf8 *C.char) {
+	enqueueOhosFor(uint64(id), ohosEvent{kind: ohosEvText, text: cString(utf8)})
+}
+
+//export gio_ohos_focus_w
+func gio_ohos_focus_w(id C.uint64_t, focused C.int) {
+	enqueueOhosFor(uint64(id), ohosEvent{kind: ohosEvFocus, focus: focused != 0})
+}
+
+//export gio_ohos_clipboard_w
+func gio_ohos_clipboard_w(id C.uint64_t, mime, text *C.char) {
+	enqueueOhosFor(uint64(id), ohosEvent{kind: ohosEvClipboard, text: cString(mime), text2: cString(text)})
+}
+
+//export gio_ohos_clipboard_data_w
+func gio_ohos_clipboard_data_w(id C.uint64_t, mime *C.char, data unsafe.Pointer, length C.int) {
+	enqueueOhosFor(uint64(id), ohosEvent{kind: ohosEvClipboardData, text: cString(mime), data: C.GoBytes(data, length)})
+}
+
+//export gio_ohos_lifecycle_w
+func gio_ohos_lifecycle_w(id C.uint64_t, state C.int) {
+	enqueueOhosFor(uint64(id), ohosEvent{kind: ohosEvLifecycle, life: ohosLifecycle(state)})
+}
+
+//export gio_ohos_insets_w
+func gio_ohos_insets_w(id C.uint64_t, top, right, bottom, left C.int) {
+	enqueueOhosFor(uint64(id), ohosEvent{kind: ohosEvInsets, top: int(top), right: int(right), bottom: int(bottom), left: int(left)})
+}
+
+//export gio_ohos_frame_w
+func gio_ohos_frame_w(id C.uint64_t) {
+	enqueueOhosFor(uint64(id), ohosEvent{kind: ohosEvFrame})
+}
+
+//export gio_ohos_window_mode_w
+func gio_ohos_window_mode_w(id C.uint64_t, mode C.int) {
+	enqueueOhosFor(uint64(id), ohosEvent{kind: ohosEvWindowMode, a: int(mode)})
+}
+
+//export gio_ohos_orientation_w
+func gio_ohos_orientation_w(id C.uint64_t, orientation C.int) {
+	enqueueOhosFor(uint64(id), ohosEvent{kind: ohosEvOrientation, a: int(orientation)})
+}
+
+//export gio_ohos_preedit_w
+func gio_ohos_preedit_w(id C.uint64_t, utf8 *C.char, selStart, selEnd C.int) {
+	enqueueOhosFor(uint64(id), ohosEvent{kind: ohosEvPreedit, text: cString(utf8), a: int(selStart), b: int(selEnd)})
+}
+
+//export gio_ohos_ime_delete_w
+func gio_ohos_ime_delete_w(id C.uint64_t, before, after C.int) {
+	enqueueOhosFor(uint64(id), ohosEvent{kind: ohosEvIMEDelete, a: int(before), b: int(after)})
+}
+
+//export gio_ohos_ime_move_w
+func gio_ohos_ime_move_w(id C.uint64_t, direction C.int) {
+	enqueueOhosFor(uint64(id), ohosEvent{kind: ohosEvIMEMove, a: int(direction)})
+}
+
+//export gio_ohos_ime_set_selection_w
+func gio_ohos_ime_set_selection_w(id C.uint64_t, start, end C.int) {
+	enqueueOhosFor(uint64(id), ohosEvent{kind: ohosEvIMESelection, a: int(start), b: int(end)})
+}
+
+//export gio_ohos_ime_enter_w
+func gio_ohos_ime_enter_w(id C.uint64_t, enterType C.int) {
+	enqueueOhosFor(uint64(id), ohosEvent{kind: ohosEvIMEEnter, a: int(enterType)})
+}
+
+//export gio_ohos_ime_keyboard_w
+func gio_ohos_ime_keyboard_w(id C.uint64_t, status C.int) {
+	enqueueOhosFor(uint64(id), ohosEvent{kind: ohosEvIMEKeyboard, a: int(status)})
+}
+
+//export gio_ohos_drop_w
+func gio_ohos_drop_w(id C.uint64_t, uris *C.char) {
+	enqueueOhosFor(uint64(id), ohosEvent{kind: ohosEvDrop, text: cString(uris)})
+}
+
+//export gio_ohos_semantic_action_w
+func gio_ohos_semantic_action_w(id C.uint64_t, nodeID, action C.int) {
+	enqueueOhosFor(uint64(id), ohosEvent{kind: ohosEvSemanticAction, a: int(nodeID), b: int(action)})
+}
+
 func ohosMetric(density, fontScale float32) unit.Metric {
 	m := unit.Metric{PxPerDp: density, PxPerSp: density * fontScale}
 	if m.PxPerDp <= 0 {
@@ -81,10 +213,10 @@ func ohosMetric(density, fontScale float32) unit.Metric {
 func ohosApplyMetric(m unit.Metric) {
 	ohosState.mu.Lock()
 	ohosState.metric = m
-	live := ohosState.win != nil
+	targets := ohosState.router.all()
 	ohosState.mu.Unlock()
-	if live {
-		enqueueOhos(ohosEvent{kind: ohosEvMetric, metric: m})
+	for _, w := range targets {
+		w.enqueue(ohosEvent{kind: ohosEvMetric, metric: m})
 	}
 }
 

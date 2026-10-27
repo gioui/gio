@@ -64,7 +64,7 @@ S11（本报告 + 基准）为收口阶段。
 | v1 shim 兼容 | 限制 | v1 host 结构更小，`install_host` 仍按 v2 尺寸读取；v1 shim 必须升级或改用 v3 入口 |
 | shim v3 实现 | 待做 | 仓库外 `libgpofdohos`；Go 侧已按判空降级 |
 | 无障碍完整虚拟树 | 待验证 | 当前 JSON/announce/action 已就绪，ArkUI 支持需真机确认 |
-| 多窗口 | 未支持 | `ohosState` 单窗口；需 ABI v4 window id |
+| 多窗口 | Go 侧已就绪 | 新增 ABI v4 路由与 `_w` 事件；shim 需实现 create/select/destroy |
 | 权限（相机/麦克风/存储） | Go 侧已支持 | `request_permission` 已实现；shim 需对接系统弹窗 |
 | Vulkan | 未启用 | 当前 EGL/GLES3 |
 | 特性开关 | 部分实现 | `GIO_OHOS_SYNC_FRAME`、`GIO_OHOS_NO_A11Y` 已实现；`GIO_OHOS_IME_LEGACY` 未实现 |

@@ -86,12 +86,12 @@ type window struct {
 	textInput bool
 	animating bool
 	ime       ohosIME
+	id        uint64
 }
 
 var ohosState = struct {
 	mu       sync.Mutex
-	win      *window
-	staging  []ohosEvent
+	router   ohosWindowRouter[*window]
 	metric   unit.Metric
 	dataDir  string
 	cacheDir string
@@ -99,16 +99,18 @@ var ohosState = struct {
 	metric: unit.Metric{PxPerDp: 1, PxPerSp: 1},
 }
 
-// enqueueOhos routes a platform callback to the current window. Callbacks
-// that arrive before the first window are staged and handed over atomically
-// by newWindow; callbacks after destroy are dropped.
+// enqueueOhos routes a legacy (no window ID) callback to the default window.
 func enqueueOhos(e ohosEvent) {
+	enqueueOhosFor(0, e)
+}
+
+// enqueueOhosFor routes a callback to window id (0 = default). Events that
+// arrive before the window exists are staged and handed over by register.
+func enqueueOhosFor(id uint64, e ohosEvent) {
 	ohosState.mu.Lock()
-	w := ohosState.win
-	if w == nil {
-		if len(ohosState.staging) < ohosQueueLimit || ohosEventCritical(e.kind) {
-			ohosState.staging = append(ohosState.staging, e)
-		}
+	w, ok := ohosState.router.get(id)
+	if !ok {
+		ohosState.router.stage(id, e)
 		ohosState.mu.Unlock()
 		return
 	}
@@ -177,15 +179,13 @@ func (w *window) loopRun(options []Option) {
 func (w *window) close() {
 	w.destroyOnce.Do(func() {
 		ohosState.mu.Lock()
-		if ohosState.win == w {
-			ohosState.win = nil
-			ohosState.staging = nil
-		}
+		ohosState.router.unregister(w.id)
 		w.qmu.Lock()
 		w.closed.Store(true)
 		w.queue.clear()
 		w.qmu.Unlock()
 		ohosState.mu.Unlock()
+		C.gio_call_destroy_window(C.uint64_t(w.id))
 		w.loop.Close()
 		close(w.done)
 	})
@@ -212,14 +212,14 @@ func newWindow(callbacks *callbacks, options []Option) {
 	if metric.PxPerSp <= 0 {
 		metric.PxPerSp = metric.PxPerDp
 	}
+	w.id = ohosState.router.assign()
 	w.pump = newOhosPump(w, w, metric)
-	staging := ohosState.staging
-	ohosState.staging = nil
-	ohosState.win = w
+	pending := ohosState.router.register(w.id, w)
 	w.qmu.Lock()
-	w.queue.items = append(w.queue.items, staging...)
+	w.queue.items = append(w.queue.items, pending...)
 	w.qmu.Unlock()
 	ohosState.mu.Unlock()
+	C.gio_call_create_window(C.uint64_t(w.id))
 
 	go w.loopRun(options)
 }
@@ -287,7 +287,16 @@ func (w *window) Configure(options []Option) {
 
 // ---- ohosHost ----
 
+// selectWindow makes id the current window for the v3 host callbacks. It is
+// a no-op on ABI 2/3 shims, which are single-window.
+func (w *window) selectWindow() {
+	if w.id != 0 {
+		C.gio_call_select_window(C.uint64_t(w.id))
+	}
+}
+
 func (w *window) Apply(d ohosConfigDelta) {
+	w.selectWindow()
 	if d.ModeSet {
 		C.gio_call_set_window_mode(C.int(ohosWindowMode(d.Mode)))
 	}
@@ -314,14 +323,17 @@ func (w *window) Apply(d ohosConfigDelta) {
 }
 
 func (w *window) HostSetAnimating(anim bool) {
+	w.selectWindow()
 	C.gio_call_set_animating(boolInt(anim))
 }
 
 func (w *window) RequestClose() bool {
+	w.selectWindow()
 	return C.gio_call_request_close() != 0
 }
 
 func (w *window) RequestPermission(name string, id int) bool {
+	w.selectWindow()
 	cn := C.CString(name)
 	defer C.free(unsafe.Pointer(cn))
 	return C.gio_call_request_permission(cn, C.int(id)) != 0
@@ -333,9 +345,9 @@ func (w *window) RequestPermission(name string, id int) bool {
 // callback is invoked synchronously with an error.
 func OHOSRequestPermission(permission string, callback func(granted bool, err error)) bool {
 	ohosState.mu.Lock()
-	w := ohosState.win
+	w, ok := ohosState.router.defaultTarget()
 	ohosState.mu.Unlock()
-	if w == nil {
+	if !ok {
 		if callback != nil {
 			callback(false, errOHOSPermissionNoWindow)
 		}
@@ -345,14 +357,17 @@ func OHOSRequestPermission(permission string, callback func(granted bool, err er
 }
 
 func (w *window) RaiseWindow() {
+	w.selectWindow()
 	C.gio_call_raise_window()
 }
 
 func (w *window) CenterWindow() {
+	w.selectWindow()
 	C.gio_call_center_window()
 }
 
 func (w *window) StartWindowMove() {
+	w.selectWindow()
 	C.gio_call_start_window_move()
 }
 
@@ -360,6 +375,7 @@ func (w *window) SetCursor(cursor pointer.Cursor) {
 	if w.closed.Load() {
 		return
 	}
+	w.selectWindow()
 	C.gio_call_set_cursor(C.int(ohosCursorNumber(cursor)))
 }
 
@@ -370,6 +386,7 @@ func (w *window) ShowTextInput(show bool) {
 	w.textInput = show
 	w.ime.keyboard = show
 	w.ime.resetWire()
+	w.selectWindow()
 	C.gio_call_show_keyboard(boolInt(show))
 	C.gio_call_ime_keyboard_status(boolInt(show))
 	if show {
@@ -390,6 +407,7 @@ func (w *window) ReadClipboard() {
 	if w.closed.Load() {
 		return
 	}
+	w.selectWindow()
 	mime := C.CString("text/plain")
 	defer C.free(unsafe.Pointer(mime))
 	C.gio_call_get_clipboard(mime)
@@ -399,6 +417,7 @@ func (w *window) WriteClipboard(mime string, s []byte) {
 	if w.closed.Load() {
 		return
 	}
+	w.selectWindow()
 	cmime := C.CString(mime)
 	defer C.free(unsafe.Pointer(cmime))
 	if len(s) > 0 && C.gio_call_set_clipboard_data(cmime, unsafe.Pointer(&s[0]), C.int(len(s))) != 0 {
@@ -422,7 +441,10 @@ func (w *window) Perform(actions system.Action) {
 
 func (w *window) ohosDeliver(e event.Event) { w.deliver(e) }
 
-func (w *window) ohosRequestFrame() { C.gio_call_invalidate() }
+func (w *window) ohosRequestFrame() {
+	w.selectWindow()
+	C.gio_call_invalidate()
+}
 
 func (w *window) ohosEditorInsert(text string) {
 	if text == "" {
@@ -517,6 +539,7 @@ func (w *window) SemanticsChanged() {
 	if len(b) == 0 {
 		return
 	}
+	w.selectWindow()
 	C.gio_call_semantics_update((*C.char)(unsafe.Pointer(&b[0])), C.int(len(b)))
 }
 
@@ -573,6 +596,7 @@ func (w *window) updateIME() {
 	if !ok || !w.ime.changed(wire) {
 		return
 	}
+	w.selectWindow()
 	ctext := C.CString(wire.text)
 	defer C.free(unsafe.Pointer(ctext))
 	C.gio_call_ime_selection(ctext, C.int(wire.length), C.int(wire.start), C.int(wire.end))

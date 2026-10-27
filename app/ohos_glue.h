@@ -19,8 +19,9 @@
 extern "C" {
 #endif
 
-#define GIO_OHOS_ABI_VERSION 3
+#define GIO_OHOS_ABI_VERSION 4
 #define GIO_OHOS_ABI2_VERSION 2
+#define GIO_OHOS_ABI3_VERSION 3
 #define GIO_OHOS_ABI1_ENTRIES 14
 
 /* Host callback table, implemented by the napi shim. */
@@ -82,11 +83,22 @@ typedef struct gio_ohos_host_v3 {
     void (*set_animating)(void *user, int animating);
 } gio_ohos_host_v3;
 
+/* ABI 4: multi-window.  The three callbacks below are optional; when they
+ * are NULL the shim is single-window and all window-scoped calls apply to
+ * the default window. */
+typedef struct gio_ohos_host_v4 {
+    gio_ohos_host_v3 v3;              /* MUST stay first */
+    void (*select_window)(void *user, uint64_t windowID);
+    void (*create_window)(void *user, uint64_t windowID);
+    void (*destroy_window)(void *user, uint64_t windowID);
+} gio_ohos_host_v4;
+
 /* Copies the host table into static storage.  Must be called before
  * gio_ohos_run; later calls replace the table.  store_host is the v2
  * entry point; store_host_v3 copies min(size, sizeof(v3)) and zero-fills. */
 void gio_ohos_store_host(const gio_ohos_host *host);
 void gio_ohos_store_host_v3(const gio_ohos_host_v3 *host, size_t size);
+void gio_ohos_store_host_v4(const gio_ohos_host_v4 *host, size_t size);
 int gio_ohos_host_ready(void);
 int gio_ohos_host_abi_version(void);
 
@@ -131,6 +143,10 @@ void gio_call_start_window_move(void);
 void gio_call_set_animating(int animating);
 void gio_call_semantics_update(const char *json, int length);
 void gio_call_semantics_announce(const char *text);
+/* ABI 4 window selection. No-ops on older shims. */
+void gio_call_select_window(uint64_t windowID);
+void gio_call_create_window(uint64_t windowID);
+void gio_call_destroy_window(uint64_t windowID);
 
 /* ---- Exported by Go (libgpofd.so) ----
  *
@@ -145,6 +161,7 @@ void gio_ohos_install_host(gio_ohos_host *host);
  * table with an explicit size.  Older shims keep using install_host. */
 int gio_ohos_abi_version(void);
 void gio_ohos_install_host_v3(gio_ohos_host_v3 *host, size_t size);
+void gio_ohos_install_host_v4(gio_ohos_host_v4 *host, size_t size);
 void gio_ohos_configure(char *dataDir, char *cacheDir, float density, float fontScale);
 void gio_ohos_run(void);
 void gio_ohos_surface_created(void *window, int width, int height);
@@ -183,6 +200,35 @@ void gio_ohos_drop(char *uris_json);            /* JSON array of absolute paths 
 void gio_ohos_clipboard_data(char *mime, void *data, int length);
 void gio_ohos_semantic_action(int nodeID, int action); /* 0 click 1 scroll forward 2 backward */
 void gio_ohos_permission_result(int requestID, int granted, char *errMsg);
+
+/* ABI 4 window-scoped events. Use these when multiple XComponents exist.
+ * The legacy (unsuffixed) entries above route to the default window. */
+void gio_ohos_surface_created_w(uint64_t windowID, void *window, int width, int height);
+void gio_ohos_surface_changed_w(uint64_t windowID, void *window, int width, int height);
+void gio_ohos_surface_destroyed_w(uint64_t windowID);
+void gio_ohos_touch_w(uint64_t windowID, int action, int pointerID, float x, float y, int mods);
+void gio_ohos_mouse_w(uint64_t windowID, int action, int button, float x, float y, int mods);
+void gio_ohos_axis_w(uint64_t windowID, float x, float y, float dx, float dy, int mods);
+void gio_ohos_pinch_w(uint64_t windowID, float x, float y, float scale, int mods);
+void gio_ohos_key_w(uint64_t windowID, int code, int action, int mods);
+void gio_ohos_text_w(uint64_t windowID, char *utf8);
+void gio_ohos_focus_w(uint64_t windowID, int focused);
+void gio_ohos_clipboard_w(uint64_t windowID, char *mime, char *text);
+void gio_ohos_clipboard_data_w(uint64_t windowID, char *mime, void *data, int length);
+void gio_ohos_lifecycle_w(uint64_t windowID, int state);
+void gio_ohos_insets_w(uint64_t windowID, int top, int right, int bottom, int left);
+void gio_ohos_frame_w(uint64_t windowID);
+void gio_ohos_window_mode_w(uint64_t windowID, int mode);
+void gio_ohos_orientation_w(uint64_t windowID, int orientation);
+void gio_ohos_preedit_w(uint64_t windowID, char *utf8, int selStart, int selEnd);
+void gio_ohos_ime_delete_w(uint64_t windowID, int before, int after);
+void gio_ohos_ime_move_w(uint64_t windowID, int direction);
+void gio_ohos_ime_set_selection_w(uint64_t windowID, int start, int end);
+void gio_ohos_ime_enter_w(uint64_t windowID, int type);
+void gio_ohos_ime_keyboard_w(uint64_t windowID, int status);
+void gio_ohos_drop_w(uint64_t windowID, char *uris_json);
+void gio_ohos_semantic_action_w(uint64_t windowID, int nodeID, int action);
+
 
 #ifdef __cplusplus
 }
