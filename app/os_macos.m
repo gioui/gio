@@ -66,6 +66,25 @@ __attribute__ ((visibility ("hidden"))) CALayer *gio_layerFactory(BOOL presentWi
 }
 @end
 
+static int gioGesturePhase(NSEventPhase phase) {
+	if (phase & NSEventPhaseCancelled) {
+		return 3;
+	}
+	if (phase & NSEventPhaseEnded) {
+		return 2;
+	}
+	if (phase & NSEventPhaseBegan) {
+		return 0;
+	}
+	if (phase & NSEventPhaseChanged) {
+		return 1;
+	}
+	if (phase & NSEventPhaseMayBegin) {
+		return 0;
+	}
+	return -1;
+}
+
 static void handleMouse(GioView *view, NSEvent *event, int typ, CGFloat dx, CGFloat dy) {
 	NSPoint p = [view convertPoint:[event locationInWindow] fromView:nil];
 	if (!event.hasPreciseScrollingDeltas) {
@@ -211,7 +230,17 @@ static void handleMouse(GioView *view, NSEvent *event, int typ, CGFloat dx, CGFl
 - (void)magnifyWithEvent:(NSEvent *)event {
 	NSPoint p = [self convertPoint:[event locationInWindow] fromView:nil];
 	CGFloat height = self.bounds.size.height;
-	gio_onMagnify(self.handle, p.x, height - p.y, event.magnification, [event timestamp], [event modifierFlags]);
+	gio_onMagnify(self.handle, p.x, height - p.y, event.magnification, [event timestamp], [event modifierFlags], gioGesturePhase(event.phase));
+}
+- (void)rotateWithEvent:(NSEvent *)event {
+	NSPoint p = [self convertPoint:[event locationInWindow] fromView:nil];
+	CGFloat height = self.bounds.size.height;
+	gio_onRotate(self.handle, p.x, height - p.y, event.rotation, [event timestamp], [event modifierFlags], gioGesturePhase(event.phase));
+}
+- (void)swipeWithEvent:(NSEvent *)event {
+	NSPoint p = [self convertPoint:[event locationInWindow] fromView:nil];
+	CGFloat height = self.bounds.size.height;
+	gio_onSwipe(self.handle, p.x, height - p.y, event.deltaX, event.deltaY, [event timestamp], [event modifierFlags]);
 }
 - (NSDragOperation)draggingEntered:(id<NSDraggingInfo>)sender {
 	NSPasteboard *pboard = [sender draggingPasteboard];

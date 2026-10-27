@@ -41,6 +41,24 @@ type Event struct {
 	// Modifiers is the set of active modifiers when
 	// the mouse button was pressed.
 	Modifiers key.Modifiers
+	// GestureID identifies a semantic gesture sequence. It is zero for
+	// non-gesture events.
+	GestureID uint32
+	// Phase is the lifecycle phase of a semantic gesture. It is only
+	// meaningful for Pinch, Rotate, Swipe and Hold events.
+	Phase GesturePhase
+	// Scale is the absolute scale of a Pinch gesture relative to its
+	// begin phase. A value of 1 is no change.
+	Scale float32
+	// Rotation is the cumulative rotation of a Rotate gesture in radians,
+	// relative to its begin phase. Positive values are clockwise in screen
+	// coordinates.
+	Rotation float32
+	// Swipe is the logical center displacement of a Swipe gesture relative
+	// to its begin phase.
+	Swipe f32.Point
+	// Fingers is the number of fingers participating in a semantic gesture.
+	Fingers uint8
 }
 
 // PassOp sets the pass-through mode. InputOps added while the pass-through
@@ -86,6 +104,21 @@ type ID uint16
 
 // Kind of an Event.
 type Kind uint
+
+// GesturePhase describes the lifecycle of a semantic gesture.
+type GesturePhase uint8
+
+const (
+	// GestureBegin starts a gesture sequence.
+	GestureBegin GesturePhase = iota
+	// GestureUpdate updates a gesture sequence.
+	GestureUpdate
+	// GestureEnd ends a gesture sequence.
+	GestureEnd
+	// GestureCancel cancels a gesture sequence; receivers should roll back
+	// any uncommitted state.
+	GestureCancel
+)
 
 // Priority of an Event.
 type Priority uint8
@@ -195,6 +228,14 @@ const (
 	Leave
 	// Scroll of a pointer.
 	Scroll
+	// Pinch is a semantic two-or-more-finger scale gesture.
+	Pinch
+	// Rotate is a semantic two-or-more-finger rotation gesture.
+	Rotate
+	// Swipe is a semantic three-or-more-finger swipe gesture.
+	Swipe
+	// Hold is a semantic multi-finger hold gesture.
+	Hold
 )
 
 const (
@@ -202,6 +243,11 @@ const (
 	Mouse Source = iota
 	// Touch generated event.
 	Touch
+	// Trackpad generated event, usually a semantic gesture or a
+	// precision-touchpad scroll.
+	Trackpad
+	// Pen generated event.
+	Pen
 )
 
 const (
@@ -290,6 +336,14 @@ func (t Kind) string() string {
 		return "Leave"
 	case Scroll:
 		return "Scroll"
+	case Pinch:
+		return "Pinch"
+	case Rotate:
+		return "Rotate"
+	case Swipe:
+		return "Swipe"
+	case Hold:
+		return "Hold"
 	default:
 		panic("unknown Type")
 	}
@@ -312,6 +366,10 @@ func (s Source) String() string {
 		return "Mouse"
 	case Touch:
 		return "Touch"
+	case Trackpad:
+		return "Trackpad"
+	case Pen:
+		return "Pen"
 	default:
 		panic("unknown source")
 	}

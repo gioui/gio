@@ -1421,3 +1421,73 @@ func TestPointerScrollDoesNotTrackPointer(t *testing.T) {
 			"the live pointer's last position is what determines it)", got, want)
 	}
 }
+
+func TestPointerSemanticGesture(t *testing.T) {
+	handler := new(int)
+	var ops op.Ops
+	var r Router
+	f := pointer.Filter{
+		Target: handler,
+		Kinds:  pointer.Pinch | pointer.Rotate | pointer.Swipe | pointer.Hold,
+	}
+	events(&r, -1, f)
+	clipStack := clip.Rect(image.Rect(0, 0, 100, 100)).Push(&ops)
+	event.Op(&ops, handler)
+	r.Frame(&ops)
+
+	r.Queue(
+		pointer.Event{
+			Kind:      pointer.Pinch,
+			Source:    pointer.Trackpad,
+			Position:  f32.Pt(50, 50),
+			GestureID: 7,
+			Phase:     pointer.GestureBegin,
+			Scale:     1,
+			Fingers:   2,
+		},
+		pointer.Event{
+			Kind:      pointer.Pinch,
+			Source:    pointer.Trackpad,
+			Position:  f32.Pt(50, 50),
+			GestureID: 7,
+			Phase:     pointer.GestureUpdate,
+			Scale:     1.5,
+			Fingers:   2,
+		},
+	)
+	clipStack.Pop()
+
+	got := events(&r, -1, f)
+	if len(got) != 2 {
+		t.Fatalf("got %d events, want 2: %v", len(got), eventsToString(got))
+	}
+	begin := got[0].(pointer.Event)
+	update := got[1].(pointer.Event)
+	if begin.Phase != pointer.GestureBegin || begin.Scale != 1 || begin.GestureID != 7 || begin.Source != pointer.Trackpad {
+		t.Fatalf("begin = %+v", begin)
+	}
+	if update.Phase != pointer.GestureUpdate || update.Scale != 1.5 || update.GestureID != 7 {
+		t.Fatalf("update = %+v", update)
+	}
+}
+
+func TestPointerSemanticGestureOptIn(t *testing.T) {
+	handler := new(int)
+	var ops op.Ops
+	var r Router
+	f := pointer.Filter{Target: handler, Kinds: pointer.Press}
+	events(&r, -1, f)
+	clipStack := clip.Rect(image.Rect(0, 0, 100, 100)).Push(&ops)
+	event.Op(&ops, handler)
+	r.Frame(&ops)
+	r.Queue(pointer.Event{
+		Kind:     pointer.Pinch,
+		Source:   pointer.Trackpad,
+		Position: f32.Pt(50, 50),
+		Phase:    pointer.GestureBegin,
+	})
+	clipStack.Pop()
+	if got := events(&r, -1, f); len(got) != 0 {
+		t.Fatalf("old filter received semantic gesture: %v", eventsToString(got))
+	}
+}

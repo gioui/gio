@@ -3,6 +3,7 @@
 > 依据：[input-gestures-cross-platform.md](input-gestures-cross-platform.md) 的矩阵、源码复核与平台 API 结论。
 > 状态：方案文档，暂未修改源码。
 > 目标：把 Gio 从“鼠标/触摸 + Scroll”升级为“可区分设备、可拿语义手势、可回退识别”的输入模型，并修正 Windows/macOS/Wayland/OHOS 的具体缺口。
+> 实施进展（2026-10-27）：事件模型与语义手势路由、macOS pinch/rotate/swipe、OHOS axis pinch、Windows PT_* 分类/触控板注册已落地；Wayland、Windows pinch/rotate、gesture 回退包、Android/iOS/Web 仍待做。
 
 ---
 
@@ -43,7 +44,7 @@
 | Rotate 单位 | 弧度，相对 begin 的累计角 | 跨平台统一；方向可测 | 平台角度/增量混用 |
 | 来源 | 显式 SourceTrackpad/SourcePen | 应用可区分设备；避免猜 | 继续挤进 Mouse/Touch |
 | 原生手势 vs 应用识别 | 优先原生语义；无原生时用 gesture 包回退 | 体验与一致性最佳 | 所有平台都在 Go 里识别 |
-| macOS 兼容 | 默认语义手势；保留一个版本的 Ctrl+Scroll 开关 | 平滑迁移 | 立即删除旧行为 |
+| macOS 行为 | 只输出语义手势，不再保留 Ctrl+Scroll 旧路径 | 本次允许破坏性升级；避免双语义 | 过渡开关 |
 | 系统手势 | 永不抢占；只处理未消费事件 | 避免返回/Home/多任务失效 | 应用强行 hook 全局 |
 
 ### 不建议的做法
@@ -317,7 +318,7 @@ func Capabilities() Capabilities
 2. rotateWithEvent → Rotate，rotation 转弧度并累计。
 3. swipeWithEvent → Swipe，delta 转 Swipe 位移；三指。
 4. scrollWheel 使用 phase/momentumPhase 映射 begin/update/end/cancel；双指滚动保持 Scroll。
-5. 删除 gio_onMagnify 的 Ctrl 修饰；保留环境变量 GIO_MACOS_LEGACY_MAGNIFY=1 作为一版回退。
+5. 删除 gio_onMagnify 的 Ctrl 修饰和旧 Scroll 合成路径；只输出语义 Pinch。
 6. 原始 NSEvent touches 可选（M4）。
 
 验收：
@@ -353,8 +354,8 @@ func Capabilities() Capabilities
 1. axis pinch 输出 Pinch（Scale 相对 begin），不再合成 Scroll；保留触摸 150ms 抑制。
 2. 双指旋转：从 axis/touch 角度变化计算 Rotate（若 shim 能提供角度则直接用）。
 3. Swipe/Hold：由 touch 合成或由 ArkUI 手势事件转发；XComponent 没有高层手势，走合成。
-4. 新增可选导出 gio_ohos_gesture_w(windowID, kind, phase, scale, rotation, dx, dy, fingers, gestureID)；不修改 ABI v4 结构，作为加法能力。
-5. shim 侧：有 ArkUI Gesture 能力时转发；否则由 touch/axis 计算。
+4. 新增导出 gio_ohos_gesture_w(windowID, kind, phase, scale, rotation, dx, dy, fingers, gestureID)；不修改 ABI v4 结构，作为加法能力。
+5. shim 侧必须同步升级：有 ArkUI Gesture 能力时转发；否则由 touch/axis 计算。不保留旧 shim 的 Scroll 回退。
 6. 文档更新 ohos-shim.md。
 
 验收：
@@ -455,13 +456,16 @@ func Capabilities() Capabilities
 
 ## 8. 兼容与迁移
 
-- 新 Kind 是**加法**；旧 Filter 不包含新 bit，不会收到。
-- pointer.Event 新增字段：keyed 字面量不受影响；unkeyed 字面量属于破坏性变更，需在 release note 说明（本 fork 可接受）。
-- macOS 默认输出 Pinch；GIO_MACOS_LEGACY_MAGNIFY=1 恢复 Ctrl+Scroll 一个版本。
-- OHOS 新导出为可选符号；旧 shim 不调用时保持现有 Scroll 回退。
+本次允许破坏性升级，**不保留兼容性开关**：
+
+- 新 Kind 是加法；旧 Filter 不包含新 bit，不会收到。
+- pointer.Event 新增字段：keyed 字面量不受影响；unkeyed 字面量属于破坏性变更，release note 说明即可（本 fork 接受）。
+- macOS 只输出 Pinch/Rotate/Swipe 语义事件；删除 Ctrl+Scroll 旧路径，不保留 GIO_MACOS_LEGACY_MAGNIFY。
+- OHOS 新导出与 shim 同步升级；不保留旧 shim 的 Scroll 回退。
 - Wayland 合成器不支持协议时无手势，不报错；应用可用 gesture 包回退。
 - 不改变 Scroll 的既有语义；新应用应优先用 Pinch/Rotate，不再依赖 Ctrl。
-- 每个平台保留独立开关：GIO_MACOS_LEGACY_MAGNIFY、GIO_WINDOWS_TOUCHPAD_GESTURES、GIO_WAYLAND_GESTURES、GIO_OHOS_GESTURES、GIO_ANDROID_GESTURES、GIO_IOS_GESTURES、GIO_WEB_GESTURES；默认开启，异常时单独回退。
+- 不保留 GIO_WINDOWS_TOUCHPAD_GESTURES、GIO_WAYLAND_GESTURES、GIO_OHOS_GESTURES、GIO_ANDROID_GESTURES、GIO_IOS_GESTURES、GIO_WEB_GESTURES 等兼容开关；异常时用 git revert 或平台级禁用。
+
 
 ---
 
@@ -473,13 +477,13 @@ func Capabilities() Capabilities
 | 平台单位不一致 | 缩放方向/速度错 | 统一 scale 绝对、rotation 弧度；每平台 fixture |
 | 原生 + 回退双份 | 双倍缩放 | 能力查询；每平台只启用一条路径 |
 | 系统手势冲突 | 返回/多任务失效 | 不抢系统手势；opt-in；真机清单 |
-| macOS 行为变化 | 旧应用 Ctrl+Scroll 失效 | 过渡环境变量；release note |
+| macOS 行为变化 | 旧应用 Ctrl+Scroll 失效 | 破坏性变更说明；需要旧行为的分支自行回退提交 |
 | OHOS shim 不支持 | 手势缺失 | 可选导出；不可用时不发假事件 |
 | 性能回退 | 输入延迟 | 0 alloc；无每事件 goroutine；基准门禁 |
 
 回滚：
 
-- 每个平台一个 feature flag（环境变量或 build tag）关闭新语义路径，回退 Scroll。
+- 不设兼容开关；回滚以 git revert 单个工作包/提交为单位。
 - WP1 的事件模型是核心，回滚需整体 revert；因此先合 WP1 的测试与空实现，再逐平台启用。
 
 ---
@@ -524,7 +528,7 @@ func Capabilities() Capabilities
 | io/input/pointer_test.go | 新旧 Kind 行为 |
 | gesture/gesture.go + 新文件 | Pinch/Rotate/Swipe/Hold 状态机 |
 | app/os_windows.go | PT_* 分类、RegisterTouchpadCapableWindow、手势 |
-| app/os_macos.go/.m | NSEvent 手势、phase、兼容开关 |
+| app/os_macos.go/.m | NSEvent 手势、phase、语义 Pinch/Rotate/Swipe |
 | app/os_wayland.go/.c | pointer-gestures、axis_source |
 | app/os_x11.go | 回退/XI2 可选 |
 | app/os_android.go + Java | 原始多点/识别器 |

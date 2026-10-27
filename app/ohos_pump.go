@@ -169,6 +169,8 @@ type ohosPump struct {
 	// （触控板）；单指触摸会错误上报 pinch，双指由原生 pointer 处理。
 	activeTouches map[int]bool
 	pinchActive   bool
+	pinchBase     float64
+	pinchID       uint32
 	lastPinch     float32
 	lastTouch     time.Time
 
@@ -318,8 +320,7 @@ func (p *ohosPump) surface(win uintptr, w, h int, sync bool) {
 
 func (p *ohosPump) surfaceDestroyed() {
 	p.activeTouches = make(map[int]bool)
-	p.pinchActive = false
-	p.lastPinch = 0
+	p.resetPinch()
 	p.frameRequested = false
 	p.frameSync = false
 	if p.valid {
@@ -453,8 +454,7 @@ func (p *ohosPump) setLifecycle(l ohosLifecycle) {
 	case ohosBackground:
 		p.life = ohosBackground
 		p.activeTouches = make(map[int]bool)
-		p.pinchActive = false
-		p.lastPinch = 0
+		p.resetPinch()
 		p.lastTouch = time.Time{}
 		p.mouseButtons = 0
 		p.frameRequested = false
@@ -501,14 +501,17 @@ func (p *ohosPump) touch(e ohosEvent) {
 	if p.activeTouches == nil {
 		p.activeTouches = make(map[int]bool)
 	}
+	if kind == pointer.Press && p.pinchActive {
+		p.emitPinch(pointer.GestureCancel, p.lastPinch, e)
+		p.resetPinch()
+	}
 	if kind == pointer.Release || kind == pointer.Cancel {
 		delete(p.activeTouches, e.id)
 	} else {
 		p.activeTouches[e.id] = true
 	}
 	if len(p.activeTouches) == 0 {
-		p.pinchActive = false
-		p.lastPinch = 0
+		p.resetPinch()
 	}
 	p.sink.ohosDeliver(pointer.Event{
 		Kind:      kind,
@@ -571,39 +574,63 @@ func (p *ohosPump) axis(e ohosEvent) {
 			scale = 0
 		}
 	}
-	if scale == 1 {
-		p.pinchActive = false
-		p.lastPinch = 0
-		scale = 0
-	}
-	if scale != 0 {
+	emitted := false
+	switch {
+	case scale == 1:
+		if p.pinchActive {
+			p.emitPinch(pointer.GestureEnd, p.lastPinch, e)
+			p.resetPinch()
+			emitted = true
+		}
+	case scale != 0:
 		if !p.pinchActive {
 			p.pinchActive = true
-			p.lastPinch = float32(scale)
-			scale = 0
-		} else {
-			prev := float64(p.lastPinch)
-			p.lastPinch = float32(scale)
-			if prev > 0 {
-				scale /= prev
-			} else {
-				scale = 0
-			}
+			p.pinchID++
+			p.pinchBase = scale
+			p.lastPinch = 1
+			p.emitPinch(pointer.GestureBegin, 1, e)
+		} else if p.pinchBase > 0 {
+			rel := float32(scale / p.pinchBase)
+			p.lastPinch = rel
+			p.emitPinch(pointer.GestureUpdate, rel, e)
 		}
+		emitted = true
 	}
-	if !ohosAxisChanged(float64(e.dy), float64(e.dx), scale) {
-		return
+	if e.dy != 0 || e.dx != 0 {
+		scroll, mods := ohosAxisScroll(float64(e.dy), float64(e.dx), e.mods)
+		p.sink.ohosDeliver(pointer.Event{
+			Kind:      pointer.Scroll,
+			Source:    pointer.Mouse,
+			PointerID: 1,
+			Position:  f32.Pt(e.x, e.y),
+			Scroll:    scroll,
+			Modifiers: mods,
+		})
+		emitted = true
 	}
-	scroll, mods := ohosAxisScroll(float64(e.dy), float64(e.dx), scale, e.mods)
+	if emitted {
+		p.requestFrame()
+	}
+}
+
+func (p *ohosPump) emitPinch(phase pointer.GesturePhase, scale float32, e ohosEvent) {
 	p.sink.ohosDeliver(pointer.Event{
-		Kind:      pointer.Scroll,
-		Source:    pointer.Mouse,
-		PointerID: 1,
+		Kind:      pointer.Pinch,
+		Source:    pointer.Trackpad,
+		GestureID: p.pinchID,
+		Phase:     phase,
+		Scale:     scale,
+		Fingers:   2,
 		Position:  f32.Pt(e.x, e.y),
-		Scroll:    scroll,
-		Modifiers: mods,
+		Modifiers: ohosModifiers(e.mods),
+		Time:      time.Since(p.start),
 	})
-	p.requestFrame()
+}
+
+func (p *ohosPump) resetPinch() {
+	p.pinchActive = false
+	p.pinchBase = 0
+	p.lastPinch = 0
 }
 
 // key translates a hardware key callback.  action: 0 down, 1 up.

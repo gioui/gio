@@ -148,7 +148,7 @@ func TestOHOSPinchSuppressionWindow(t *testing.T) {
 	f.events = nil
 	p.axis(ohosEvent{scale: 1.2, x: 1, y: 1})
 	p.axis(ohosEvent{scale: 1.44, x: 1, y: 1})
-	if len(f.events) != 1 {
+	if len(f.events) != 2 {
 		t.Fatalf("touchpad pinch must resume: %#v", f.events)
 	}
 }

@@ -743,6 +743,11 @@ func (q *pointerQueue) Push(handlers map[event.Tag]*handler, state pointerState,
 		// Scroll events are not bound to a pointer; see pointer.Event.PointerID.
 		return state, q.deliverScrollEvent(handlers, evts, e)
 	}
+	if isGestureKind(e.Kind) {
+		// Semantic gestures are not bound to a pointer and do not
+		// participate in enter/leave/press state.
+		return state, q.deliverGestureEvent(handlers, evts, e)
+	}
 	state, pidx := state.pointerOf(e)
 	p := state.pointers[pidx]
 
@@ -781,6 +786,24 @@ func (q *pointerQueue) Push(handlers map[event.Tag]*handler, state pointerState,
 		state.pointers[pidx] = p
 	}
 	return state, evts
+}
+
+func isGestureKind(k pointer.Kind) bool {
+	return k&(pointer.Pinch|pointer.Rotate|pointer.Swipe|pointer.Hold) != 0
+}
+
+// deliverGestureEvent delivers semantic gestures to every handler hit by
+// the event coordinate. Unlike pointer events, gestures have no pointer
+// identity and no enter/leave/press lifecycle.
+func (q *pointerQueue) deliverGestureEvent(handlers map[event.Tag]*handler, evts []taggedEvent, e pointer.Event) []taggedEvent {
+	var hits []event.Tag
+	q.hitTest(e.Position, func(n *hitNode) bool {
+		if _, ok := handlers[n.tag]; ok {
+			hits = addHandler(hits, n.tag)
+		}
+		return true
+	})
+	return q.deliverEvent(handlers, pointerInfo{handlers: hits}, evts, e)
 }
 
 // deliverScrollEvent delivers scroll events to the handlers hit by the event coordinate.

@@ -2,6 +2,7 @@
 
 > 范围：Windows、macOS、Linux（X11/Wayland）、Android、iOS/iPadOS、HarmonyOS/OpenHarmony、Web；并对照 Gio 当前实现。
 > 结论用于决定 Gio 的输入事件模型与 OHOS/桌面后端下一步改造，不替代各平台 API 文档。
+> 实现进展（2026-10-27）：pointer 事件模型（Source/Kind/Phase/Scale/Rotation/Swipe）与语义手势路由已落地；macOS pinch/rotate/swipe、OHOS axis pinch、Windows PT_* 分类与 Precision Touchpad 注册已接入；Wayland/Android/iOS/Web 与 Windows pinch/rotate 仍待做。
 
 ---
 
@@ -209,8 +210,9 @@
 
 ## 6. Gio 当前输入模型与差距
 
-### 6.1 模型
+### 6.1 模型（改造前基线）
 
+> 下面是本次改造前的模型，用于解释为什么需要新增 Source/Kind 字段；当前实现已扩展，见第 7 节。 
 ~~~go
 // io/pointer
 type Source uint8
@@ -244,25 +246,25 @@ type Event struct {
 
 | 后端 | 触摸 | 滚动 | Pinch | Rotate | Swipe | Trackpad 来源 |
 |---|---|---|---|---|---|---|
-| Windows | WM_POINTER；PT_TOUCHPAD 误归类为 Touch | WM_POINTERWHEEL | ❌ | ❌ | ❌ | ❌ |
-| macOS | ❌ 无触摸屏 | scrollWheel | magnify → Ctrl+Scroll | ❌ | ❌ | ❌ |
+| macOS | ❌ 无触摸屏 | scrollWheel | Pinch（magnify） | Rotate | Swipe | ✅ Trackpad |
 | X11 | ❌ 无 XI2 touch | 按钮 4–7 | ❌ | ❌ | ❌ | ❌ |
 | Wayland | wl_touch | wl_pointer.axis | ❌ 未绑 pointer-gestures | ❌ | ❌ | ❌ 忽略 axis_source |
 | Android | MotionEvent 多点 | generic motion | ❌ | ❌ | ❌ | ❌ |
 | iOS | UITouch | ❌ | ❌ | ❌ | ❌ | ❌ |
-| OHOS | XComponent touch | AxisEvent | Axis pinch → Scroll | ❌ | ❌ | ❌ |
+| OHOS | XComponent touch | AxisEvent | Pinch（axis） | ❌ | ❌ | ❌ |
+| Windows | WM_POINTER；PT_TOUCHPAD 已分类 | WM_POINTERWHEEL | ❌ 尚未接 InteractionContext | ❌ | ❌ | ✅ Trackpad/Pen 分类 |
 | Web | Touch Events | wheel | ❌（可能 ctrl+wheel） | ❌ | ❌ | ❌ |
 
 ### 6.3 关键问题
 
-1. **语义丢失**：pinch 被降级为 Ctrl+Scroll 后，应用无法区分“用户捏合”与“按住 Ctrl 滚轮”，也无法拿到 scale 的绝对值/旋转。
-2. **来源丢失**：触控板、鼠标、触摸、笔都挤进 Mouse/Touch；应用无法按设备类型调整交互（如触控板 hover、笔压力）。
-3. **相位丢失**：没有 begin/update/end/cancel，连续手势无法正确提交/回滚（尤其惯性、撤销）。
-4. **系统手势冲突**：没有声明/仲裁 API，应用无法知道哪些边缘/三指手势被系统保留。
-5. **Windows 具体 bug**：PT_TOUCHPAD → pointer.Touch；且未注册 Precision Touchpad，很多设备根本不会发 WM_POINTER 触控板帧。
-6. **Wayland 具体缺口**：axis_source 被忽略，无法区分滚轮/触控板/连续滚动；未绑定 zwp_pointer_gestures_v1。
-7. **macOS 具体缺口**：rotateWithEvent/swipeWithEvent/原始 trackpad touches 未接；magnify 被错误标成 Ctrl。
-8. **OHOS 具体缺口**：axis pinch 只合成 Scroll；rotate/swipe/hold 未接；Native 侧没有 ArkUI 手势识别器可用。
+1. **语义丢失**：pinch 曾降级为 Ctrl+Scroll；**macOS/OHOS 已改为语义 Pinch**，Wayland/Windows 仍待接。
+2. **来源丢失**：触控板、鼠标、触摸、笔曾挤进 Mouse/Touch；**Windows 已按 PT_* 分类，macOS 手势为 Trackpad，OHOS pinch 为 Trackpad**；Wayland/Android/iOS 仍待。
+3. **相位丢失**：新 Event 已有 Phase；**macOS/OHOS 已填 begin/update/end/cancel**；滚动 phase 仍待补。
+4. **系统手势冲突**：没有声明/仲裁 API，应用无法知道哪些边缘/三指手势被系统保留；**仍待设计**。
+5. **Windows 具体 bug**：PT_TOUCHPAD 曾归为 pointer.Touch；**已修分类并注册 Precision Touchpad**，但 pinch/rotate 尚未接 InteractionContext。
+6. **Wayland 具体缺口**：axis_source 被忽略；未绑定 zwp_pointer_gestures_v1；**仍待做**。
+7. **macOS 具体缺口**：rotateWithEvent/swipeWithEvent 曾未接、magnify 被标 Ctrl；**已修**。
+8. **OHOS 具体缺口**：axis pinch 曾只合成 Scroll；**已改为语义 Pinch**；rotate/swipe/hold 仍待。
 
 ---
 

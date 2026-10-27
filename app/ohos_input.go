@@ -89,13 +89,6 @@ const (
 	ohosModMeta = 1 << 4
 )
 
-// ohosPinchScroll converts a relative pinch scale (1.0 = unchanged, opening
-// the fingers > 1) into a wheel delta.  Gio and gpofd both use "negative
-// Scroll.Y = zoom in", so opening must produce a negative delta; we also add
-// Ctrl so canvas.wheelZoom selects the zoom path, matching trackpad pinch on
-// the desktop. Opening must zoom in; see docs/ohos-remediation-plan.md (WP6).
-const ohosPinchScroll = 400
-
 // ohosKeyName translates an OpenHarmony key code into a Gio key name.
 func ohosKeyName(code int) (key.Name, bool) {
 	switch code {
@@ -291,22 +284,8 @@ func ohosPrintable(code int, mods int) (string, bool) {
 	return "", false
 }
 
-// ohosAxisScroll converts axis values into a pointer scroll delta.  vertical
-// and horizontal are device scroll amounts (positive = down/right); pinch is
-// the relative scale (1.0 = unchanged, > 1 = opening).  A pinch also sets the
-// Ctrl modifier so the canvas takes its zoom path.
-func ohosAxisScroll(vertical, horizontal, pinch float64, mods int) (f32.Point, key.Modifiers) {
-	m := ohosModifiers(mods)
-	dx := float32(horizontal)
-	dy := float32(vertical)
-	if pinch != 0 && pinch != 1 {
-		dy += float32(-(pinch - 1) * ohosPinchScroll)
-		m |= key.ModCtrl
-	}
-	return f32.Pt(dx, dy), m
-}
-
-// ohosAxisChanged reports whether an axis event carries a usable delta.
-func ohosAxisChanged(vertical, horizontal, pinch float64) bool {
-	return vertical != 0 || horizontal != 0 || (pinch != 0 && pinch != 1)
+// ohosAxisScroll converts axis values into a pointer scroll delta. vertical
+// and horizontal are device scroll amounts (positive = down/right).
+func ohosAxisScroll(vertical, horizontal float64, mods int) (f32.Point, key.Modifiers) {
+	return f32.Pt(float32(horizontal), float32(vertical)), ohosModifiers(mods)
 }

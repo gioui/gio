@@ -219,6 +219,9 @@ func (w *window) init() error {
 	if err := windows.EnableMouseInPointer(1); err != nil {
 		return err
 	}
+	// Precision touchpad input is opt-in; older Windows versions may not
+	// export this function, in which case touchpad input remains wheel-only.
+	_ = windows.RegisterTouchpadCapableWindow(hwnd, true)
 	w.hdc, err = windows.GetDC(hwnd)
 	if err != nil {
 		windows.DestroyWindow(hwnd)
@@ -689,9 +692,16 @@ func (w *window) pointerUpdate(pi windows.PointerInfo, pid pointer.ID, kind poin
 		windows.SetFocus(w.hwnd)
 	}
 
-	src := pointer.Touch
-	if pi.PointerType == windows.PT_MOUSE {
+	var src pointer.Source
+	switch pi.PointerType {
+	case windows.PT_MOUSE:
 		src = pointer.Mouse
+	case windows.PT_TOUCHPAD:
+		src = pointer.Trackpad
+	case windows.PT_PEN:
+		src = pointer.Pen
+	default:
+		src = pointer.Touch
 	}
 
 	x, y := coordsFromlParam(lParam)

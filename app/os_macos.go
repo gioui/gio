@@ -8,6 +8,7 @@ import (
 	"errors"
 	"image"
 	"io"
+	"math"
 	"runtime"
 	"runtime/cgo"
 	"strings"
@@ -370,6 +371,10 @@ type window struct {
 	scale  float32
 	config Config
 
+	gestureID       uint32
+	gestureScale    float32
+	gestureRotation float32
+
 	keysDown map[key.Name]struct{}
 	// cmdKeys is for storing the current key event while
 	// waiting for a doCommandBySelector.
@@ -730,20 +735,103 @@ func gio_onMouse(h C.uintptr_t, evt C.CFTypeRef, cdir C.int, cbtn C.NSInteger, x
 	})
 }
 
-//export gio_onMagnify
-func gio_onMagnify(h C.uintptr_t, x, y, delta C.CGFloat, ti C.double, mods C.NSUInteger) {
-	if delta == 0 {
-		return
+func macGesturePhase(p C.int) (pointer.GesturePhase, bool) {
+	switch int(p) {
+	case 0:
+		return pointer.GestureBegin, true
+	case 1:
+		return pointer.GestureUpdate, true
+	case 2:
+		return pointer.GestureEnd, true
+	case 3:
+		return pointer.GestureCancel, true
+	default:
+		return pointer.GestureUpdate, false
 	}
+}
+
+func (w *window) beginMacGesture() {
+	w.gestureID++
+	w.gestureScale = 1
+	w.gestureRotation = 0
+}
+
+//export gio_onMagnify
+func gio_onMagnify(h C.uintptr_t, x, y, delta C.CGFloat, ti C.double, mods C.NSUInteger, cphase C.int) {
 	w := windowFor(h)
+	phase, ok := macGesturePhase(cphase)
+	if !ok {
+		phase = pointer.GestureUpdate
+	}
+	if w.gestureID == 0 || phase == pointer.GestureBegin {
+		w.beginMacGesture()
+		phase = pointer.GestureBegin
+	}
+	if delta != 0 {
+		w.gestureScale *= float32(1 + float64(delta))
+	}
 	t := time.Duration(float64(ti)*float64(time.Second) + .5)
 	w.ProcessEvent(pointer.Event{
-		Kind:      pointer.Scroll,
-		Source:    pointer.Mouse,
+		Kind:      pointer.Pinch,
+		Source:    pointer.Trackpad,
+		GestureID: w.gestureID,
+		Phase:     phase,
+		Scale:     w.gestureScale,
+		Fingers:   2,
 		Time:      t,
 		Position:  f32.Point{X: float32(x) * w.scale, Y: float32(y) * w.scale},
-		Scroll:    f32.Point{Y: magnifyScroll(float64(delta))},
-		Modifiers: convertMods(mods) | key.ModCtrl,
+		Modifiers: convertMods(mods),
+	})
+	if phase == pointer.GestureEnd || phase == pointer.GestureCancel {
+		w.gestureID = 0
+		w.gestureScale = 0
+	}
+}
+
+//export gio_onRotate
+func gio_onRotate(h C.uintptr_t, x, y, degrees C.CGFloat, ti C.double, mods C.NSUInteger, cphase C.int) {
+	w := windowFor(h)
+	phase, ok := macGesturePhase(cphase)
+	if !ok {
+		phase = pointer.GestureUpdate
+	}
+	if w.gestureID == 0 || phase == pointer.GestureBegin {
+		w.beginMacGesture()
+		phase = pointer.GestureBegin
+	}
+	w.gestureRotation += float32(float64(degrees) * math.Pi / 180)
+	t := time.Duration(float64(ti)*float64(time.Second) + .5)
+	w.ProcessEvent(pointer.Event{
+		Kind:      pointer.Rotate,
+		Source:    pointer.Trackpad,
+		GestureID: w.gestureID,
+		Phase:     phase,
+		Rotation:  w.gestureRotation,
+		Fingers:   2,
+		Time:      t,
+		Position:  f32.Point{X: float32(x) * w.scale, Y: float32(y) * w.scale},
+		Modifiers: convertMods(mods),
+	})
+	if phase == pointer.GestureEnd || phase == pointer.GestureCancel {
+		w.gestureID = 0
+		w.gestureRotation = 0
+	}
+}
+
+//export gio_onSwipe
+func gio_onSwipe(h C.uintptr_t, x, y, dx, dy C.CGFloat, ti C.double, mods C.NSUInteger) {
+	w := windowFor(h)
+	w.gestureID++
+	w.ProcessEvent(pointer.Event{
+		Kind:      pointer.Swipe,
+		Source:    pointer.Trackpad,
+		GestureID: w.gestureID,
+		Phase:     pointer.GestureEnd,
+		Swipe:     f32.Point{X: float32(dx) * w.scale, Y: float32(dy) * w.scale},
+		Fingers:   3,
+		Position:  f32.Point{X: float32(x) * w.scale, Y: float32(y) * w.scale},
+		Time:      time.Duration(float64(ti)*float64(time.Second) + .5),
+		Modifiers: convertMods(mods),
 	})
 }
 

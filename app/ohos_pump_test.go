@@ -141,16 +141,20 @@ func TestOHOSPinchRequiresTouchpad(t *testing.T) {
 	// 纯触控板窗口从未出现 touch，axis pinch 仍可用。
 	p2, f2 := newTestPump()
 	p2.axis(ohosEvent{scale: 1.2, x: 10, y: 10})
-	if len(f2.events) != 0 {
-		t.Fatalf("first touchpad sample must only establish baseline: %#v", f2.events)
+	if len(f2.events) != 1 {
+		t.Fatalf("first touchpad sample must begin a pinch: %#v", f2.events)
 	}
 	p2.axis(ohosEvent{scale: 1.44, x: 10, y: 10})
-	if len(f2.events) != 1 {
-		t.Fatalf("second touchpad sample must emit one scroll: %#v", f2.events)
+	if len(f2.events) != 2 {
+		t.Fatalf("second touchpad sample must update the pinch: %#v", f2.events)
 	}
-	pe, ok := f2.events[0].(pointer.Event)
-	if !ok || pe.Scroll.Y >= 0 || !pe.Modifiers.Contain(key.ModCtrl) {
-		t.Fatalf("touchpad pinch must zoom in: %#v", f2.events[0])
+	begin, ok := f2.events[0].(pointer.Event)
+	if !ok || begin.Kind != pointer.Pinch || begin.Phase != pointer.GestureBegin || begin.Scale != 1 || begin.Source != pointer.Trackpad {
+		t.Fatalf("pinch begin = %#v", f2.events[0])
+	}
+	update := f2.events[1].(pointer.Event)
+	if update.Kind != pointer.Pinch || update.Phase != pointer.GestureUpdate || update.Scale < 1.19 || update.Scale > 1.21 {
+		t.Fatalf("pinch update = %#v", update)
 	}
 }
 
@@ -189,19 +193,36 @@ func TestOHOSModifiers(t *testing.T) {
 	}
 }
 
-func TestOHOSPinchDirection(t *testing.T) {
-	open, mods := ohosAxisScroll(0, 0, 1.1, 0)
-	if open.Y >= 0 {
-		t.Fatalf("opening pinch must produce negative Scroll.Y (zoom in), got %v", open)
+func TestOHOSPinchPhases(t *testing.T) {
+	p, f := newTestPump()
+	p.axis(ohosEvent{scale: 1.2, x: 10, y: 20})
+	p.axis(ohosEvent{scale: 1.44, x: 10, y: 20})
+	p.axis(ohosEvent{scale: 1, x: 10, y: 20})
+	if len(f.events) != 3 {
+		t.Fatalf("pinch phases = %#v", f.events)
 	}
-	if mods&key.ModCtrl == 0 {
-		t.Fatalf("pinch must set Ctrl so the canvas zooms: %v", mods)
+	begin := f.events[0].(pointer.Event)
+	update := f.events[1].(pointer.Event)
+	end := f.events[2].(pointer.Event)
+	if begin.Phase != pointer.GestureBegin || begin.Scale != 1 || begin.GestureID == 0 {
+		t.Fatalf("begin = %+v", begin)
 	}
-	close, _ := ohosAxisScroll(0, 0, 0.9, 0)
-	if close.Y <= 0 {
-		t.Fatalf("closing pinch must produce positive Scroll.Y (zoom out), got %v", close)
+	if update.Phase != pointer.GestureUpdate || update.Scale < 1.19 || update.Scale > 1.21 {
+		t.Fatalf("update = %+v", update)
 	}
-	plain, mods := ohosAxisScroll(30, -12, 0, 0)
+	if end.Phase != pointer.GestureEnd || end.Scale < 1.19 || end.Scale > 1.21 {
+		t.Fatalf("end = %+v", end)
+	}
+	if begin.GestureID != update.GestureID || begin.GestureID != end.GestureID {
+		t.Fatalf("gesture IDs differ: %+v %+v %+v", begin, update, end)
+	}
+	if begin.Source != pointer.Trackpad || begin.Fingers != 2 {
+		t.Fatalf("source/fingers = %v/%d", begin.Source, begin.Fingers)
+	}
+}
+
+func TestOHOSAxisScrollPlain(t *testing.T) {
+	plain, mods := ohosAxisScroll(30, -12, 0)
 	if plain.Y != 30 || plain.X != -12 || mods != 0 {
 		t.Fatalf("plain scroll = %v, mods %v", plain, mods)
 	}
