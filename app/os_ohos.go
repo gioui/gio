@@ -19,7 +19,6 @@ import "C"
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -89,7 +88,6 @@ var ohosState = struct {
 	metric   unit.Metric
 	dataDir  string
 	cacheDir string
-	win      *window
 }{
 	notify: make(chan struct{}, 1),
 	metric: unit.Metric{PxPerDp: 1, PxPerSp: 1},
@@ -152,7 +150,6 @@ func newWindow(callbacks *callbacks, options []Option) {
 	if metric.PxPerSp <= 0 {
 		metric.PxPerSp = metric.PxPerDp
 	}
-	ohosState.win = w
 	ohosState.mu.Unlock()
 
 	w.pump = newOhosPump(w, metric)
@@ -201,7 +198,7 @@ func (w *window) NewContext() (context, error) {
 
 func (w *window) SetAnimating(anim bool) {
 	w.animating = anim
-	enqueueOhos(ohosEvent{kind: ohosEvSetAnimating, focus: anim})
+	enqueueOhos(ohosEvent{kind: ohosEvSetAnimating, anim: anim})
 }
 
 func (w *window) Configure(options []Option) {
@@ -323,7 +320,7 @@ func (w *window) ohosPickError(mode int, msg string) {
 }
 
 func (w *window) ohosLog(msg string) {
-	_, _ = fmt.Fprintf(os.Stderr, "[gio-ohos] %s\n", msg)
+	ohosDebugf("log:"+msg, "%s", msg)
 }
 
 // updateIME reports the surrounding text, selection and caret rectangle to
@@ -537,7 +534,7 @@ func gio_ohos_lifecycle(state C.int) {
 func gio_ohos_log(msg *C.char) {
 	s := cString(msg)
 	if s != "" {
-		_, _ = fmt.Fprintf(os.Stderr, "[gio-ohos] %s\n", s)
+		ohosDebugf("shimlog:"+s, "%s", s)
 	}
 }
 

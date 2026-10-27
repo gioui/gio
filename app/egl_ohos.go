@@ -18,7 +18,7 @@ import (
 // ohosContext implements Gio's context interface for a HarmonyOS
 // OHNativeWindow obtained from an XComponent.  Refresh only records the
 // window; the EGL surface is created in Lock on the render thread, exactly
-// like the Android backend (docs/44 §4.1).
+// like the Android backend (docs/ohos-backend.md).
 type ohosContext struct {
 	win     *window
 	eglSurf egl.NativeWindowType
@@ -54,7 +54,7 @@ func (c *ohosContext) Refresh() error {
 		return errOutOfDate
 	}
 	// Fixed RGBA8888 + explicit geometry: some XComponent surfaces come up
-	// with a format EGL rejects (docs/45 WP-3 risk box).
+	// with a format EGL rejects (see docs/ohos-remediation-plan.md, WP2).
 	C.gio_ohos_set_buffer_format(unsafe.Pointer(win), 12 /* NATIVEBUFFER_PIXEL_FMT_RGBA_8888 */)
 	C.gio_ohos_set_buffer_geometry(unsafe.Pointer(win), C.int(size.X), C.int(size.Y))
 	c.eglSurf = egl.NativeWindowType(win)

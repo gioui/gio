@@ -5,7 +5,7 @@
 // (libgpofdohos.so).  It is deliberately free of napi/ArkTS headers so the
 // backend can be built and tested without the HarmonyOS SDK.
 //
-// ABI 1 entries are frozen (14 exports, see docs/44 §3.4).  ABI 2 adds a small
+// ABI 1 entries are frozen (14 exports, see docs/ohos-remediation-plan.md §5).  ABI 2 adds a small
 // set of *compatible* extensions: callers must not assume them to be present
 // (the shim may be older), and receivers must tolerate NULL host pointers.
 

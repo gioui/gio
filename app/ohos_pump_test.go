@@ -344,3 +344,29 @@ func TestOHOSPumpIMEAndPicker(t *testing.T) {
 		t.Fatalf("pickErr = %q", f.pickErr)
 	}
 }
+
+func TestOHOSNoPerEventLogs(t *testing.T) {
+	p, f := newTestPump()
+	p.Handle(ohosEvent{kind: ohosEvSurfaceCreated, win: 7, w: 100, h: 100})
+	p.Handle(ohosEvent{kind: ohosEvTouch, action: 1, id: 1, x: 1, y: 2})
+	p.Handle(ohosEvent{kind: ohosEvMouse, action: 2, x: 3, y: 4})
+	p.Handle(ohosEvent{kind: ohosEvAxis, dx: 1, dy: 2})
+	if len(f.logs) != 0 {
+		t.Fatalf("input and frame paths must not log: %#v", f.logs)
+	}
+}
+
+func TestOHOSDebugFlag(t *testing.T) {
+	t.Setenv("GIO_OHOS_DEBUG", "")
+	if ohosDebugEnabled() {
+		t.Fatal("debug must be off by default")
+	}
+	t.Setenv("GIO_OHOS_DEBUG", "1")
+	if !ohosDebugEnabled() {
+		t.Fatal("GIO_OHOS_DEBUG=1 must enable diagnostics")
+	}
+	t.Setenv("GIO_OHOS_DEBUG", "false")
+	if ohosDebugEnabled() {
+		t.Fatal("GIO_OHOS_DEBUG=false must disable diagnostics")
+	}
+}

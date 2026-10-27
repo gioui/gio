@@ -5,7 +5,6 @@
 package app
 
 import (
-	"fmt"
 	"image"
 	"io"
 	"strings"
@@ -89,6 +88,7 @@ type ohosEvent struct {
 	code   int
 	mods   int
 	focus  bool
+	anim   bool
 	life   ohosLifecycle
 
 	text  string
@@ -121,7 +121,7 @@ type ohosSink interface {
 
 // ohosPump turns platform callbacks into Gio events.  It is deliberately free
 // of cgo and of *window so that the pump can be exercised on any platform
-// (docs/45 L3).  All methods must be called from the single ohosLoop goroutine.
+// (docs/ohos-backend.md).  All methods must be called from the single ohosLoop goroutine.
 type ohosPump struct {
 	sink   ohosSink
 	metric unit.Metric
@@ -219,7 +219,7 @@ func (p *ohosPump) Handle(e ohosEvent) {
 	case ohosEvPickError:
 		p.sink.ohosPickError(e.action, e.text)
 	case ohosEvSetAnimating:
-		p.SetAnimating(e.focus)
+		p.SetAnimating(e.anim)
 	case ohosEvConfigure:
 		p.Configure(e.opts)
 	}
@@ -227,7 +227,7 @@ func (p *ohosPump) Handle(e ohosEvent) {
 
 // surface handles created/changed callbacks.  A zero-sized surface is
 // remembered but produces no frame: creating an EGL surface for it would fail
-// and spam the log (docs/45 WP-3).
+// and spam the log (see docs/ohos-remediation-plan.md, WP2).
 func (p *ohosPump) surface(win uintptr, w, h int, sync bool) {
 	if win == 0 || w <= 0 || h <= 0 {
 		p.valid = false
@@ -367,7 +367,6 @@ func (p *ohosPump) setLifecycle(l ohosLifecycle) {
 // touch translates a pointer callback.  action: 0 down, 1 move, 2 up, 3 cancel.
 func (p *ohosPump) touch(e ohosEvent) {
 	p.touchSeen = true
-	p.sink.ohosLog(fmt.Sprintf("ohos touch id=%d action=%d x=%.1f y=%.1f", e.id, e.action, e.x, e.y))
 	var kind pointer.Kind
 	switch e.action {
 	case 0:
@@ -441,7 +440,6 @@ func (p *ohosPump) mouse(e ohosEvent) {
 
 func (p *ohosPump) axis(e ohosEvent) {
 	scale := float64(e.scale)
-	p.sink.ohosLog(fmt.Sprintf("ohos axis active=%d touchSeen=%v scale=%.3f dy=%.3f", len(p.activeTouches), p.touchSeen, scale, e.dy))
 	// 手机触摸会错误上报单指 pinch；只要本窗口见过任何原生触点，
 	// 就不再接受 axis pinch。纯触控板窗口从未有 touch 事件，仍可走 axis。
 	if p.touchSeen && scale != 0 && scale != 1 {

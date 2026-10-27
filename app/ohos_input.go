@@ -75,7 +75,7 @@ const (
 // the fingers > 1) into a wheel delta.  Gio and gpofd both use "negative
 // Scroll.Y = zoom in", so opening must produce a negative delta; we also add
 // Ctrl so canvas.wheelZoom selects the zoom path, matching trackpad pinch on
-// the desktop.  See docs/45 (§M1 acceptance: opening = zoom in).
+// the desktop. Opening must zoom in; see docs/ohos-remediation-plan.md (WP6).
 const ohosPinchScroll = 400
 
 // ohosKeyName translates an OpenHarmony key code into a Gio key name.
