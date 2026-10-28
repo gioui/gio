@@ -66,6 +66,10 @@ type renderer struct {
 	intersections packer
 	layers        packer
 	layerFBOs     fboSet
+	// srgbTextures reports whether the backend can allocate
+	// TextureFormatSRGBA textures. It is cleared on the first failure so
+	// that later uploads go straight to TextureFormatRGBA8.
+	srgbTextures bool
 }
 
 type drawOps struct {
@@ -474,11 +478,28 @@ func (r *renderer) texHandle(cache *textureCache, data imageOpData) driver.Textu
 		minFilter, magFilter = driver.FilterNearest, driver.FilterNearest
 	}
 
-	handle, err := r.ctx.NewTexture(driver.TextureFormatSRGBA,
-		data.src.Bounds().Dx(), data.src.Bounds().Dy(),
-		minFilter, magFilter,
-		driver.BufferBindingTexture,
-	)
+	newTex := func(format driver.TextureFormat) (driver.Texture, error) {
+		return r.ctx.NewTexture(format,
+			data.src.Bounds().Dx(), data.src.Bounds().Dy(),
+			minFilter, magFilter,
+			driver.BufferBindingTexture,
+		)
+	}
+	format := driver.TextureFormatSRGBA
+	if !r.srgbTextures {
+		format = driver.TextureFormatRGBA8
+	}
+	handle, err := newTex(format)
+	if err != nil && format == driver.TextureFormatSRGBA {
+		// Some drivers report sRGB support but reject SRGB8_ALPHA8 textures
+		// with GL_INVALID_ENUM (observed on Kylin V10 + Zhaoxin C-960 /
+		// Mesa 21). Fall back to a linear RGBA8 texture instead of panicking;
+		// the image is sampled without the sRGB->linear conversion, a slightly
+		// less accurate but usable result. Remember the failure so later
+		// uploads skip the doomed attempt.
+		r.srgbTextures = false
+		handle, err = newTex(driver.TextureFormatRGBA8)
+	}
 	if err != nil {
 		panic(err)
 	}
@@ -495,9 +516,10 @@ func (t *texture) release() {
 
 func newRenderer(ctx driver.Device) *renderer {
 	r := &renderer{
-		ctx:     ctx,
-		blitter: newBlitter(ctx),
-		pather:  newPather(ctx),
+		ctx:          ctx,
+		blitter:      newBlitter(ctx),
+		pather:       newPather(ctx),
+		srgbTextures: true,
 	}
 
 	maxDim := ctx.Caps().MaxTextureSize

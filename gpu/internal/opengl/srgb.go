@@ -97,14 +97,27 @@ func (s *SRGBFBO) Refresh(viewport image.Point) error {
 	if s.viewport == viewport {
 		return nil
 	}
-	s.viewport = viewport
 	s.state.bindTexture(s.c, 0, s.tex)
-	s.c.TexImage2D(gl.TEXTURE_2D, 0, s.format.internalFormat, viewport.X, viewport.Y, s.format.format, s.format.typ)
-	s.state.bindFramebuffer(s.c, gl.FRAMEBUFFER, s.fbo)
-	s.c.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, s.tex, 0)
-	if st := s.c.CheckFramebufferStatus(gl.FRAMEBUFFER); st != gl.FRAMEBUFFER_COMPLETE {
-		return fmt.Errorf("sRGB framebuffer incomplete (%dx%d), status: %#x error: %x", viewport.X, viewport.Y, st, s.c.GetError())
+	if err := s.attach(viewport); err != nil {
+		s.viewport = image.Point{}
+		// Some drivers advertise sRGB framebuffer support but fail to
+		// attach a SRGB8_ALPHA8 texture (observed on Kylin V10 with a
+		// Zhaoxin C-960 GPU and Mesa 21: GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT,
+		// GL_INVALID_ENUM). Degrade to a linear RGBA8 attachment instead of
+		// failing the frame: the blit below becomes a plain copy, trading
+		// gamma-correct blending for a usable window. This is the same
+		// trade-off NewSRGBFBO already makes when no sRGB texture format is
+		// advertised.
+		if s.format.internalFormat == gl.RGBA8 {
+			return err
+		}
+		s.format = textureTriple{gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE}
+		if err := s.attach(viewport); err != nil {
+			s.viewport = image.Point{}
+			return err
+		}
 	}
+	s.viewport = viewport
 
 	if runtime.GOOS == "js" {
 		// With macOS Safari, rendering to and then reading from a SRGB8_ALPHA8
@@ -122,6 +135,18 @@ func (s *SRGBFBO) Refresh(viewport image.Point) error {
 		}
 	}
 
+	return nil
+}
+
+// attach (re)allocates the backing texture and attaches it as the
+// color attachment of the framebuffer.
+func (s *SRGBFBO) attach(viewport image.Point) error {
+	s.c.TexImage2D(gl.TEXTURE_2D, 0, s.format.internalFormat, viewport.X, viewport.Y, s.format.format, s.format.typ)
+	s.state.bindFramebuffer(s.c, gl.FRAMEBUFFER, s.fbo)
+	s.c.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, s.tex, 0)
+	if st := s.c.CheckFramebufferStatus(gl.FRAMEBUFFER); st != gl.FRAMEBUFFER_COMPLETE {
+		return fmt.Errorf("sRGB framebuffer incomplete (%dx%d), status: %#x error: %x", viewport.X, viewport.Y, st, s.c.GetError())
+	}
 	return nil
 }
 
