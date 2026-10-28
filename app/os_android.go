@@ -137,8 +137,6 @@ import (
 	"unicode/utf16"
 	"unsafe"
 
-	"gioui.org/io/transfer"
-
 	"gioui.org/internal/f32color"
 	"gioui.org/op"
 
@@ -149,6 +147,7 @@ import (
 	"gioui.org/io/pointer"
 	"gioui.org/io/semantic"
 	"gioui.org/io/system"
+	"gioui.org/io/transfer"
 	"gioui.org/unit"
 )
 
