@@ -710,6 +710,14 @@ func (b *Backend) NewTexture(format driver.TextureFormat, width, height int, min
 		// OpenGL ES 2 only supports mipmaps for power-of-two textures.
 		mipmap = false
 	}
+	if !mipmap {
+		// Without mip levels the sampler must not ask for them: a mipmap
+		// filter on a single-level texture leaves it incomplete, and some
+		// drivers then sample the whole texture as black (observed on Kylin
+		// V10 + Zhaoxin C-960 / Mesa 21, where every glyph and image
+		// disappeared).
+		min = gl.LINEAR
+	}
 	tex.mipmap = mipmap
 	b.funcs.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, mag)
 	b.funcs.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, min)
