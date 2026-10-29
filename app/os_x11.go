@@ -735,14 +735,15 @@ func (h *x11EventHandler) handleEvents() bool {
 		case C.Expose: // update
 			// redraw only on the last expose event
 			redraw = (*C.XExposeEvent)(unsafe.Pointer(xev)).count == 0
-		case C.FocusIn:
-			w.config.Focused = true
+		case C.FocusIn, C.FocusOut:
+			// NotifyPointer reports that keys reach the window through the pointer
+			// while focus is on an ancestor, not that the window has focus.
+			if (*C.XFocusChangeEvent)(unsafe.Pointer(xev)).detail == C.NotifyPointer {
+				break
+			}
+			w.config.Focused = _type == C.FocusIn
 			w.ProcessEvent(ConfigEvent{Config: w.config})
-			w.ibus.Focused(true)
-		case C.FocusOut:
-			w.config.Focused = false
-			w.ProcessEvent(ConfigEvent{Config: w.config})
-			w.ibus.Focused(false)
+			w.ibus.Focused(w.config.Focused)
 		case C.ConfigureNotify: // window configuration change
 			cevt := (*C.XConfigureEvent)(unsafe.Pointer(xev))
 			if sz := image.Pt(int(cevt.width), int(cevt.height)); sz != w.config.Size {
