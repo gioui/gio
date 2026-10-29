@@ -48,6 +48,13 @@ func init() {
 		if err := ctx.CreateSurface(eglSurf); err != nil {
 			return nil, err
 		}
+		// eglSwapInterval applies to the current context's draw surface.
+		if err := ctx.MakeCurrent(); err != nil {
+			ctx.Release()
+			C.wl_egl_window_destroy(eglWin)
+			return nil, err
+		}
+		defer ctx.ReleaseCurrent()
 		// We're in charge of the frame callbacks, don't let eglSwapBuffers
 		// wait for callbacks that may never arrive.
 		ctx.EnableVSync(false)
