@@ -4,6 +4,7 @@ package widget
 
 import (
 	"image"
+	"sync"
 
 	"gioui.org/f32"
 	"gioui.org/font"
@@ -51,6 +52,10 @@ type TextInfo struct {
 	Truncated int
 }
 
+// Backend interface calls make this temporary glyph buffer escape. Reuse it
+// across labels, without sharing a mutable buffer between concurrent layouts.
+var labelGlyphBuffers = sync.Pool{New: func() any { return new([32]text.Glyph) }}
+
 // Layout the label with the given shaper, font, size, text, and material, returning metadata about the shaped text.
 func (l Label) LayoutDetailed(gtx layout.Context, lt *text.Shaper, font font.Font, size unit.Sp, txt string, textMaterial op.CallOp) (layout.Dimensions, TextInfo) {
 	cs := gtx.Constraints
@@ -77,7 +82,8 @@ func (l Label) LayoutDetailed(gtx layout.Context, lt *text.Shaper, font font.Fon
 		material: textMaterial,
 	}
 	semantic.LabelOp(txt).Add(gtx.Ops)
-	var glyphs [32]text.Glyph
+	glyphs := labelGlyphBuffers.Get().(*[32]text.Glyph)
+	defer labelGlyphBuffers.Put(glyphs)
 	line := glyphs[:0]
 	for g, ok := lt.NextGlyph(); ok; g, ok = lt.NextGlyph() {
 		var ok bool
@@ -199,8 +205,7 @@ func fixedToFloat(i fixed.Int26_6) float32 {
 // a backing array of sufficient size to buffer multiple glyphs.
 // A modified slice will be returned with each invocation, and is
 // expected to be passed back in on the following invocation.
-// This design is awkward, but prevents the line slice from escaping
-// to the heap.
+// The caller owns and reuses the backing buffer.
 func (it *textIterator) paintGlyph(gtx layout.Context, shaper *text.Shaper, glyph text.Glyph, line []text.Glyph) ([]text.Glyph, bool) {
 	visibleOrBefore := it.processGlyph(glyph, true)
 	if it.visible {
@@ -212,11 +217,14 @@ func (it *textIterator) paintGlyph(gtx layout.Context, shaper *text.Shaper, glyp
 	if glyph.Flags&text.FlagLineBreak != 0 || cap(line)-len(line) == 0 || !visibleOrBefore {
 		t := op.Affine(f32.AffineId().Offset(it.lineOff)).Push(gtx.Ops)
 		path := shaper.Shape(line)
-		outline := clip.Outline{Path: path}.Op().Push(gtx.Ops)
-		it.material.Add(gtx.Ops)
-		paint.PaintOp{}.Add(gtx.Ops)
-		outline.Pop()
+		if !path.Empty() {
+			outline := clip.Outline{Path: path}.Op().Push(gtx.Ops)
+			it.material.Add(gtx.Ops)
+			paint.PaintOp{}.Add(gtx.Ops)
+			outline.Pop()
+		}
 		if call := shaper.Bitmaps(line); call != (op.CallOp{}) {
+			it.material.Add(gtx.Ops)
 			call.Add(gtx.Ops)
 		}
 		t.Pop()
