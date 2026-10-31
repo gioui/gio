@@ -85,6 +85,11 @@ func runOnMain(f func()) {
 		f()
 		return
 	}
+	postOnMain(f)
+}
+
+// postOnMain schedules f to run on the main thread later.
+func postOnMain(f func()) {
 	C.gio_runOnMain(C.uintptr_t(cgo.NewHandle(f)))
 }
 
@@ -252,7 +257,7 @@ func windowSetCursor(from, to pointer.Cursor) pointer.Cursor {
 }
 
 func (w *window) wakeup() {
-	runOnMain(func() {
+	postOnMain(func() {
 		w.loop.Wakeup()
 		w.loop.FlushEvents()
 	})

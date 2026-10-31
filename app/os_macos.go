@@ -983,6 +983,10 @@ func (w *window) Invalidate() {
 }
 
 func (w *window) Run(f func()) {
+	if isMainThread() {
+		f()
+		return
+	}
 	w.loop.Run(f)
 }
 
