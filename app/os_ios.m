@@ -55,17 +55,11 @@ CGFloat _keyboardHeight;
 }
 
 - (void)applicationWillEnterForeground:(UIApplication *)application {
-	GioView *view = (GioView *)self.view.subviews[0];
-	if (view != nil) {
-		onStart(view.handle);
-	}
+	onEnterForeground();
 }
 
 - (void)applicationDidEnterBackground:(UIApplication *)application {
-	GioView *view = (GioView *)self.view.subviews[0];
-	if (view != nil) {
-		onStop(view.handle);
-	}
+	onEnterBackground();
 }
 
 - (void)viewDidDisappear:(BOOL)animated {

@@ -2,12 +2,15 @@
 
 package org.gioui;
 
+import android.app.Activity;
+import android.app.Application;
 import android.content.ClipboardManager;
 import android.content.ClipData;
 import android.content.ClipDescription;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.PersistableBundle;
@@ -41,10 +44,50 @@ public final class Gio {
 			System.loadLibrary("gio");
 			runGoMain(dataDirUTF8, appCtx);
 			jniLoaded = true;
+			Context ctx = appCtx.getApplicationContext();
+			if (ctx instanceof Application) {
+				((Application)ctx).registerActivityLifecycleCallbacks(new BackgroundCallbacks());
+			}
 		}
 	}
 
 	static private native void runGoMain(byte[] dataDir, Context context);
+	static private native void onAllActivitiesStopped();
+	static private native void onFirstActivityStarted();
+
+	/**
+	 * BackgroundCallbacks reports the program going to the background when
+	 * the last started activity of the process stops, and coming back when
+	 * an activity starts again.
+	 */
+	private static final class BackgroundCallbacks implements Application.ActivityLifecycleCallbacks {
+		private int started;
+		private boolean inBackground;
+
+		@Override public void onActivityStarted(Activity activity) {
+			started++;
+			if (started == 1 && inBackground) {
+				inBackground = false;
+				onFirstActivityStarted();
+			}
+		}
+
+		@Override public void onActivityStopped(Activity activity) {
+			started--;
+			// A configuration change re-creates the activity right away, the
+			// program does not go to the background.
+			if (started == 0 && !activity.isChangingConfigurations()) {
+				inBackground = true;
+				onAllActivitiesStopped();
+			}
+		}
+
+		@Override public void onActivityCreated(Activity activity, Bundle state) {}
+		@Override public void onActivityResumed(Activity activity) {}
+		@Override public void onActivityPaused(Activity activity) {}
+		@Override public void onActivitySaveInstanceState(Activity activity, Bundle state) {}
+		@Override public void onActivityDestroyed(Activity activity) {}
+	}
 
 	static void startForeground(Context ctx, String title, String text) {
 		Intent i = new Intent(ctx, GioForegroundService.class);

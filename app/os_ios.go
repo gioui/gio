@@ -109,7 +109,6 @@ type window struct {
 	displayLink *displayLink
 	loop        *eventLoop
 
-	hidden bool
 	cursor pointer.Cursor
 	config Config
 
@@ -117,6 +116,12 @@ type window struct {
 }
 
 var mainWindow = newWindowRendezvous()
+
+// inBackground tracks whether the program is in the background, to stop drawing
+// there and to report each change once: UIKit also posts the foreground
+// notification at launch, and every view controller observes both
+// notifications. It is only accessed on the main thread.
+var inBackground bool
 
 func init() {
 	// Darwin requires UI operations happen on the main thread only.
@@ -157,7 +162,7 @@ func gio_onDraw(h C.uintptr_t) {
 }
 
 func (w *window) draw(sync bool) {
-	if w.hidden {
+	if inBackground {
 		return
 	}
 	params := C.viewDrawParams(w.view)
@@ -189,17 +194,22 @@ func (w *window) draw(sync bool) {
 	})
 }
 
-//export onStop
-func onStop(h C.uintptr_t) {
-	w := viewFor(h)
-	w.hidden = true
+//export onEnterBackground
+func onEnterBackground() {
+	if inBackground {
+		return
+	}
+	processGlobalEvent(BackgroundEvent{})
+	inBackground = true
 }
 
-//export onStart
-func onStart(h C.uintptr_t) {
-	w := viewFor(h)
-	w.hidden = false
-	w.draw(true)
+//export onEnterForeground
+func onEnterForeground() {
+	if !inBackground {
+		return
+	}
+	processGlobalEvent(ForegroundEvent{})
+	inBackground = false
 }
 
 //export onDestroy

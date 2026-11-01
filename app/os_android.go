@@ -404,6 +404,16 @@ func Java_org_gioui_Gio_runGoMain(env *C.JNIEnv, class C.jclass, jdataDir C.jbyt
 	runMain()
 }
 
+//export Java_org_gioui_Gio_onAllActivitiesStopped
+func Java_org_gioui_Gio_onAllActivitiesStopped(env *C.JNIEnv, class C.jclass) {
+	processGlobalEvent(BackgroundEvent{})
+}
+
+//export Java_org_gioui_Gio_onFirstActivityStarted
+func Java_org_gioui_Gio_onFirstActivityStarted(env *C.JNIEnv, class C.jclass) {
+	processGlobalEvent(ForegroundEvent{})
+}
+
 func initJVM(env *C.JNIEnv, gio C.jclass, ctx C.jobject) {
 	android.mu.Lock()
 	defer android.mu.Unlock()
