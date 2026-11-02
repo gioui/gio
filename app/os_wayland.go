@@ -369,7 +369,9 @@ func (d *wlDisplay) createNativeWindow(options []Option) (*window, error) {
 		clipReads: make(chan transfer.DataEvent, 1),
 	}
 	// Default to server-side decorations.
-	w.config.Decorated = true
+	if w.decor != nil {
+		w.config.Decorated = true
+	}
 	w.surf = C.wl_compositor_create_surface(d.compositor)
 	if w.surf == nil {
 		w.destroy()
