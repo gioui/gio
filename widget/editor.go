@@ -5,6 +5,7 @@ package widget
 import (
 	"bufio"
 	"image"
+	"image/color"
 	"io"
 	"math"
 	"strings"
@@ -70,6 +71,9 @@ type Editor struct {
 	// PaintSelectionWhenUnfocused controls whether the selection is highlighted
 	// even when the editor does not have focus.
 	PaintSelectionWhenUnfocused bool
+	// SelectedTextColor is the color of selected text. Zero alpha keeps the text
+	// color. Color glyphs keep their own colors.
+	SelectedTextColor color.NRGBA
 
 	buffer *editBuffer
 	// scratch is a byte buffer that is reused to efficiently read portions of text
@@ -791,21 +795,30 @@ func (e *Editor) layout(gtx layout.Context, textMaterial, selectMaterial op.Call
 	return visibleDims
 }
 
+func (e *Editor) selectionVisible(gtx layout.Context) bool {
+	return gtx.Focused(e) || e.PaintSelectionWhenUnfocused
+}
+
 // paintSelection paints the contrasting background for selected text using the provided
 // material to set the painting material for the selection.
 func (e *Editor) paintSelection(gtx layout.Context, material op.CallOp) {
 	e.initBuffer()
-	if !gtx.Focused(e) && !e.PaintSelectionWhenUnfocused {
+	if !e.selectionVisible(gtx) {
 		return
 	}
 	e.text.PaintSelection(gtx, material)
 }
 
-// paintText paints the text glyphs using the provided material to set the fill of the
-// glyphs.
+// paintText paints text with material and uses SelectedTextColor for the selection.
 func (e *Editor) paintText(gtx layout.Context, material op.CallOp) {
 	e.initBuffer()
-	e.text.PaintText(gtx, material)
+	if e.SelectedTextColor.A == 0 || !e.selectionVisible(gtx) {
+		e.text.PaintText(gtx, material)
+		return
+	}
+	m := op.Record(gtx.Ops)
+	paint.ColorOp{Color: e.SelectedTextColor}.Add(gtx.Ops)
+	e.text.PaintSelectedText(gtx, material, m.Stop())
 }
 
 func (e *Editor) paintComposition(gtx layout.Context, material op.CallOp) {

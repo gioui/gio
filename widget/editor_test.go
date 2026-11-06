@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"fmt"
 	"image"
+	"image/color"
 	"io"
 	"math/rand"
 	"reflect"
@@ -20,6 +21,7 @@ import (
 	"gioui.org/font"
 	"gioui.org/font/gofont"
 	"gioui.org/font/opentype"
+	"gioui.org/gpu/headless"
 	"gioui.org/io/input"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
@@ -1327,6 +1329,53 @@ func TestEditor_Submit(t *testing.T) {
 	}
 	if !reflect.DeepEqual(want, got) {
 		t.Errorf("editor failed to register submit")
+	}
+}
+
+func TestEditorSelectedTextColor(t *testing.T) {
+	const (
+		width  = 120
+		height = 30
+	)
+	textColor := color.NRGBA{A: 0xff}
+	selectionColor := color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff}
+	selectedColor := color.NRGBA{R: 0xff, A: 0xff}
+
+	shaper := text.NewShaper(text.NoSystemFonts(), text.WithCollection(gofont.Collection()))
+	render := func(selected color.NRGBA) *image.RGBA {
+		e := new(Editor)
+		e.PaintSelectionWhenUnfocused = true
+		e.SelectedTextColor = selected
+		e.SetText("Hello")
+		e.SetCaret(0, len("Hello"))
+		ops := new(op.Ops)
+		gtx := layout.Context{
+			Ops:         ops,
+			Constraints: layout.Exact(image.Pt(width, height)),
+			Locale:      english,
+		}
+		e.Layout(gtx, shaper, font.Font{}, unit.Sp(16),
+			colorMaterial(ops, textColor), colorMaterial(ops, selectionColor))
+		window, err := headless.NewWindow(width, height)
+		if err != nil {
+			t.Skipf("headless renderer unavailable: %v", err)
+		}
+		defer window.Release()
+		if err := window.Frame(ops); err != nil {
+			t.Fatal(err)
+		}
+		pixels := image.NewRGBA(image.Rectangle{Max: image.Pt(width, height)})
+		if err := window.Screenshot(pixels); err != nil {
+			t.Fatal(err)
+		}
+		return pixels
+	}
+
+	if got := countSelectedColorPixels(render(color.NRGBA{})); got != 0 {
+		t.Fatalf("unset SelectedTextColor painted %d selected-colour pixels", got)
+	}
+	if got := countSelectedColorPixels(render(selectedColor)); got == 0 {
+		t.Fatal("SelectedTextColor did not paint the selected glyphs")
 	}
 }
 

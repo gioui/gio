@@ -108,6 +108,17 @@ type textIterator struct {
 	// the color of the glyphs is undefined and may change unpredictably if the
 	// text contains color glyphs.
 	material op.CallOp
+	// selectedMaterial replaces material for selected glyphs. Zero disables it.
+	selectedMaterial op.CallOp
+	// selectionRegions are the highlight rectangles in viewport coordinates,
+	// ordered from left to right.
+	selectionRegions []Region
+	// selectionStart and selectionEnd delimit the selected glyphs.
+	selectionStart, selectionEnd int
+	// glyphIndex is the index of the next glyph.
+	glyphIndex int
+	// batchSelected reports whether the buffered glyphs are selected.
+	batchSelected bool
 	// truncated tracks the count of truncated runes in the text.
 	truncated int
 	// linesSeen tracks the quantity of line endings this iterator has seen.
@@ -203,6 +214,13 @@ func fixedToFloat(i fixed.Int26_6) float32 {
 // to the heap.
 func (it *textIterator) paintGlyph(gtx layout.Context, shaper *text.Shaper, glyph text.Glyph, line []text.Glyph) ([]text.Glyph, bool) {
 	visibleOrBefore := it.processGlyph(glyph, true)
+	selected := it.selectedMaterial != (op.CallOp{}) &&
+		it.glyphIndex >= it.selectionStart && it.glyphIndex < it.selectionEnd
+	it.glyphIndex++
+	if selected != it.batchSelected {
+		line = it.flush(gtx, shaper, line)
+		it.batchSelected = selected
+	}
 	if it.visible {
 		if len(line) == 0 {
 			it.lineOff = f32.Point{X: fixedToFloat(glyph.X), Y: float32(glyph.Y)}.Sub(layout.FPt(it.viewport.Min))
@@ -210,17 +228,84 @@ func (it *textIterator) paintGlyph(gtx layout.Context, shaper *text.Shaper, glyp
 		line = append(line, glyph)
 	}
 	if glyph.Flags&text.FlagLineBreak != 0 || cap(line)-len(line) == 0 || !visibleOrBefore {
-		t := op.Affine(f32.AffineId().Offset(it.lineOff)).Push(gtx.Ops)
-		path := shaper.Shape(line)
-		outline := clip.Outline{Path: path}.Op().Push(gtx.Ops)
-		it.material.Add(gtx.Ops)
-		paint.PaintOp{}.Add(gtx.Ops)
-		outline.Pop()
-		if call := shaper.Bitmaps(line); call != (op.CallOp{}) {
-			call.Add(gtx.Ops)
-		}
-		t.Pop()
-		line = line[:0]
+		line = it.flush(gtx, shaper, line)
 	}
 	return line, visibleOrBefore
+}
+
+// flush paints the buffered glyphs and resets the buffer.
+func (it *textIterator) flush(gtx layout.Context, shaper *text.Shaper, line []text.Glyph) []text.Glyph {
+	if len(line) == 0 {
+		return line[:0]
+	}
+	path := shaper.Shape(line)
+	if it.batchSelected {
+		it.paintSelectedBatch(gtx, path, int(line[0].Y))
+	} else {
+		it.paintPath(gtx, path, it.material)
+	}
+	if call := shaper.Bitmaps(line); call != (op.CallOp{}) {
+		// Color glyphs are bitmaps, so they are never inverted.
+		t := op.Affine(f32.AffineId().Offset(it.lineOff)).Push(gtx.Ops)
+		call.Add(gtx.Ops)
+		t.Pop()
+	}
+	return line[:0]
+}
+
+// paintPath fills the shaped glyphs with material.
+func (it *textIterator) paintPath(gtx layout.Context, path clip.PathSpec, material op.CallOp) {
+	t := op.Affine(f32.AffineId().Offset(it.lineOff)).Push(gtx.Ops)
+	outline := clip.Outline{Path: path}.Op().Push(gtx.Ops)
+	material.Add(gtx.Ops)
+	paint.PaintOp{}.Add(gtx.Ops)
+	outline.Pop()
+	t.Pop()
+}
+
+// paintSelectedBatch paints one line of selected glyphs: the parts covered by the
+// selection rectangles get the selected material, everything else the regular one.
+// They are painted separately so translucent colors are blended once.
+//
+// Rectangles are viewport-relative while glyphs use document coordinates, so the
+// line baseline is converted before matching them.
+func (it *textIterator) paintSelectedBatch(gtx layout.Context, path clip.PathSpec, baseline int) {
+	viewport := it.viewport.Sub(it.viewport.Min)
+	viewport.Min = viewport.Min.Add(it.padding.Min)
+	viewport.Max = viewport.Max.Add(it.padding.Max)
+	paintRect := func(rect image.Rectangle, material op.CallOp) {
+		if rect.Empty() {
+			return
+		}
+		area := clip.Rect(rect).Push(gtx.Ops)
+		it.paintPath(gtx, path, material)
+		area.Pop()
+	}
+	x := viewport.Min.X
+	var top, bottom int
+	found := false
+	for _, region := range it.selectionRegions {
+		if region.Bounds.Max.Y-region.Baseline != baseline-it.viewport.Min.Y {
+			continue
+		}
+		bounds := region.Bounds.Intersect(viewport)
+		if bounds.Empty() {
+			continue
+		}
+		if !found {
+			top, bottom = bounds.Min.Y, bounds.Max.Y
+			found = true
+			paintRect(image.Rect(viewport.Min.X, viewport.Min.Y, viewport.Max.X, top), it.material)
+			paintRect(image.Rect(viewport.Min.X, bottom, viewport.Max.X, viewport.Max.Y), it.material)
+		}
+		paintRect(image.Rect(x, top, max(x, bounds.Min.X), bottom), it.material)
+		bounds.Min.X = max(x, bounds.Min.X)
+		paintRect(bounds, it.selectedMaterial)
+		x = max(x, bounds.Max.X)
+	}
+	if found {
+		paintRect(image.Rect(x, top, viewport.Max.X, bottom), it.material)
+	} else {
+		it.paintPath(gtx, path, it.material)
+	}
 }

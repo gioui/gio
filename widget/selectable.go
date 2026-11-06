@@ -2,6 +2,7 @@ package widget
 
 import (
 	"image"
+	"image/color"
 	"io"
 	"math"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/clip"
+	"gioui.org/op/paint"
 	"gioui.org/text"
 	"gioui.org/unit"
 )
@@ -70,8 +72,11 @@ type Selectable struct {
 	// PaintSelectionWhenUnfocused controls whether the selection is highlighted
 	// even when the selectable does not have focus.
 	PaintSelectionWhenUnfocused bool
-	initialized                 bool
-	source                      stringSource
+	// SelectedTextColor is the color of selected text. Zero alpha keeps the text
+	// color. Color glyphs keep their own colors.
+	SelectedTextColor color.NRGBA
+	initialized       bool
+	source            stringSource
 	// scratch is a buffer reused to efficiently read text out of the
 	// textView.
 	scratch   []byte
@@ -100,19 +105,29 @@ func (l *Selectable) Focused() bool {
 	return l.focused
 }
 
+func (l *Selectable) selectionVisible() bool {
+	return l.focused || l.PaintSelectionWhenUnfocused
+}
+
 // paintSelection paints the contrasting background for selected text.
 func (l *Selectable) paintSelection(gtx layout.Context, material op.CallOp) {
 	l.initialize()
-	if !l.focused && !l.PaintSelectionWhenUnfocused {
+	if !l.selectionVisible() {
 		return
 	}
 	l.text.PaintSelection(gtx, material)
 }
 
-// paintText paints the text glyphs with the provided material.
+// paintText paints text with material and uses SelectedTextColor for the selection.
 func (l *Selectable) paintText(gtx layout.Context, material op.CallOp) {
 	l.initialize()
-	l.text.PaintText(gtx, material)
+	if l.SelectedTextColor.A == 0 || !l.selectionVisible() {
+		l.text.PaintText(gtx, material)
+		return
+	}
+	m := op.Record(gtx.Ops)
+	paint.ColorOp{Color: l.SelectedTextColor}.Add(gtx.Ops)
+	l.text.PaintSelectedText(gtx, material, m.Stop())
 }
 
 // SelectionLen returns the length of the selection, in runes; it is
