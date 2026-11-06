@@ -727,6 +727,11 @@ func (h *x11EventHandler) handleEvents() bool {
 				Time:      time.Duration(mevt.time) * time.Millisecond,
 				Modifiers: w.xkb.Modifiers(),
 			})
+		case C.LeaveNotify:
+			cevt := (*C.XCrossingEvent)(unsafe.Pointer(xev))
+			if w.pointerBtns == 0 && cevt.detail != C.NotifyInferior {
+				w.ProcessEvent(pointer.Event{Kind: pointer.Cancel})
+			}
 		case C.Expose: // update
 			// redraw only on the last expose event
 			redraw = (*C.XExposeEvent)(unsafe.Pointer(xev)).count == 0
@@ -903,6 +908,7 @@ func newX11Window(gioWin *callbacks, options []Option) error {
 			C.KeyPressMask | C.KeyReleaseMask | // keyboard
 			C.ButtonPressMask | C.ButtonReleaseMask | // mouse clicks
 			C.PointerMotionMask | // mouse movement
+			C.LeaveWindowMask | // pointer leaving the window
 			C.StructureNotifyMask, // resize
 		background_pixmap: C.None,
 		override_redirect: C.False,
