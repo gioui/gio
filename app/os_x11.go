@@ -701,6 +701,11 @@ func (h *x11EventHandler) handleEvents() bool {
 			default:
 				continue
 			}
+			if ev.Kind == pointer.Scroll && _type == C.ButtonRelease {
+				// The X server sends a press and a release for every wheel
+				// notch; only the press scrolls, or each notch counts twice.
+				continue
+			}
 			switch _type {
 			case C.ButtonPress:
 				w.pointerBtns |= btn
