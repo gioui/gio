@@ -307,26 +307,16 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 				return 0
 			}
 		}
-	case windows.WM_POINTERDOWN, windows.WM_POINTERUP, windows.WM_POINTERUPDATE, windows.WM_POINTERCAPTURECHANGED:
+	case windows.WM_POINTERDOWN, windows.WM_POINTERUP, windows.WM_POINTERUPDATE,
+		windows.WM_POINTERLEAVE, windows.WM_POINTERCAPTURECHANGED,
+		windows.WM_NCPOINTERUPDATE, windows.WM_NCPOINTERDOWN, windows.WM_NCPOINTERUP:
 		pid := getPointerIDwParam(wParam)
 		pi, err := windows.GetPointerInfo(uint32(pid))
 		if err != nil {
 			panic(err)
 		}
 
-		kind := pointer.Move
-		switch pi.ButtonChangeType {
-		case windows.POINTER_CHANGE_FIRSTBUTTON_DOWN, windows.POINTER_CHANGE_SECONDBUTTON_DOWN, windows.POINTER_CHANGE_THIRDBUTTON_DOWN, windows.POINTER_CHANGE_FOURTHBUTTON_DOWN, windows.POINTER_CHANGE_FIFTHBUTTON_DOWN:
-			kind = pointer.Press
-		case windows.POINTER_CHANGE_FIRSTBUTTON_UP, windows.POINTER_CHANGE_SECONDBUTTON_UP, windows.POINTER_CHANGE_THIRDBUTTON_UP, windows.POINTER_CHANGE_FOURTHBUTTON_UP, windows.POINTER_CHANGE_FIFTHBUTTON_UP:
-			kind = pointer.Release
-		}
-
-		if (pi.PointerFlags&windows.POINTER_FLAG_CANCELED != 0) || (msg == windows.WM_POINTERCAPTURECHANGED) {
-			kind = pointer.Cancel
-		}
-
-		w.pointerUpdate(pi, pid, kind, lParam)
+		w.pointerUpdate(pi, pid, pointerKind(msg, pi), lParam)
 	case windows.WM_CANCELMODE:
 		w.ProcessEvent(pointer.Event{
 			Kind: pointer.Cancel,
@@ -641,8 +631,31 @@ func (w *window) hitTest(x, y int) uintptr {
 	return windows.HTCLIENT
 }
 
+func pointerKind(msg uint32, pi windows.PointerInfo) pointer.Kind {
+	if pi.PointerFlags&windows.POINTER_FLAG_CANCELED != 0 || msg == windows.WM_POINTERCAPTURECHANGED {
+		return pointer.Cancel
+	}
+	switch msg {
+	case windows.WM_POINTERLEAVE, windows.WM_NCPOINTERUPDATE, windows.WM_NCPOINTERDOWN, windows.WM_NCPOINTERUP:
+		// Treat non-client input as leaving the client area.
+		return pointer.Leave
+	}
+	switch pi.ButtonChangeType {
+	case windows.POINTER_CHANGE_FIRSTBUTTON_DOWN, windows.POINTER_CHANGE_SECONDBUTTON_DOWN,
+		windows.POINTER_CHANGE_THIRDBUTTON_DOWN, windows.POINTER_CHANGE_FOURTHBUTTON_DOWN,
+		windows.POINTER_CHANGE_FIFTHBUTTON_DOWN:
+		return pointer.Press
+	case windows.POINTER_CHANGE_FIRSTBUTTON_UP, windows.POINTER_CHANGE_SECONDBUTTON_UP,
+		windows.POINTER_CHANGE_THIRDBUTTON_UP, windows.POINTER_CHANGE_FOURTHBUTTON_UP,
+		windows.POINTER_CHANGE_FIFTHBUTTON_UP:
+		return pointer.Release
+	default:
+		return pointer.Move
+	}
+}
+
 func (w *window) pointerUpdate(pi windows.PointerInfo, pid pointer.ID, kind pointer.Kind, lParam uintptr) {
-	if !w.config.Focused {
+	if !w.config.Focused && kind != pointer.Leave {
 		windows.SetFocus(w.hwnd)
 	}
 
