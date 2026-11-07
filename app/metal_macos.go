@@ -17,6 +17,9 @@ CALayer *gio_layerFactory(BOOL presentWithTrans) {
 		l.autoresizingMask = kCALayerHeightSizable|kCALayerWidthSizable;
 		l.needsDisplayOnBoundsChange = YES;
 		l.presentsWithTransaction = presentWithTrans;
+		// Enable transparency for external views.
+		l.opaque = NO;
+		l.backgroundColor = [NSColor clearColor].CGColor;
 		return l;
 	}
 }

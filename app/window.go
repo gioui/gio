@@ -195,6 +195,12 @@ func (w *Window) validateAndProcess(size image.Point, sync bool, frame *op.Ops, 
 			}
 		}
 		w.queue.Frame(frame)
+		// Capture native view changes before the client can reuse its frame.
+		if w.gpu != nil {
+			if d, ok := w.driver.(interface{ BeforePresent() }); ok {
+				d.BeforePresent()
+			}
+		}
 		// Let the client continue as soon as possible, in particular before
 		// a potentially blocking Present.
 		signal()
@@ -202,6 +208,11 @@ func (w *Window) validateAndProcess(size image.Point, sync bool, frame *op.Ops, 
 		if w.gpu != nil {
 			err = w.ctx.Present()
 			w.ctx.Unlock()
+			if err == nil {
+				if d, ok := w.driver.(interface{ AfterPresent() error }); ok {
+					err = d.AfterPresent()
+				}
+			}
 			if errors.Is(err, gpu.ErrDeviceLost) {
 				// The frame is already released to the client and can't be
 				// retried. Re-create the GPU context in the next frame.
@@ -226,7 +237,10 @@ func (w *Window) frame(frame *op.Ops, viewport image.Point) error {
 	if err != nil {
 		return err
 	}
-	return w.gpu.Frame(frame, target, viewport)
+	if err := w.gpu.Frame(frame, target, viewport); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (w *Window) processFrame(frame *op.Ops, ack chan<- struct{}) {
@@ -417,6 +431,13 @@ func (c *callbacks) ProcessFrame(frame *op.Ops, ack chan<- struct{}) {
 
 func (c *callbacks) ProcessEvent(e event.Event) bool {
 	return c.w.processEvent(e)
+}
+
+func (c *callbacks) EmbeddedRegions() (active gpu.EmbedRegions, lost []gpu.EmbedView) {
+	if c.w.gpu == nil {
+		return gpu.EmbedRegions{}, nil
+	}
+	return c.w.gpu.EmbedRegions()
 }
 
 // SemanticRoot returns the ID of the semantic root.

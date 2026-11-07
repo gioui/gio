@@ -55,6 +55,22 @@ type LinearGradientOp struct {
 // PaintOp fills the current clip area with the current brush.
 type PaintOp struct{}
 
+// EmbedOp is a special paint operation that renders a external view (such as a webview,
+// video-player or ad view).
+//
+// EmbedOp makes the Gio canvas transparent and allows touch/clicks events to go through.
+// The external view is positioned and sized to match the current clip area.
+//
+// Platform-specific constructors:
+//   - Android: AndroidView (JNI global reference to android.view.View)
+//   - Windows: Win32View (HWND handle)
+//   - macOS:   AppKitView (pointer to NSView)
+//   - iOS:     UIKitView (pointer to UIView)
+type EmbedOp struct {
+	view    uintptr
+	surface uintptr
+}
+
 // OpacityStack represents an opacity applied to all painting operations
 // until Pop is called.
 type OpacityStack struct {
@@ -149,6 +165,11 @@ func (c LinearGradientOp) Add(o *op.Ops) {
 func (d PaintOp) Add(o *op.Ops) {
 	data := ops.Write(&o.Internal, ops.TypePaintLen)
 	data[0] = byte(ops.TypePaint)
+}
+
+func (e EmbedOp) Add(o *op.Ops) {
+	data := ops.Write2(&o.Internal, ops.TypeEmbedLen, e.view, e.surface)
+	data[0] = byte(ops.TypeEmbed)
 }
 
 // FillShape fills the clip shape with a color.

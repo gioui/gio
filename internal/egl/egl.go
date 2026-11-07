@@ -120,6 +120,12 @@ func (c *Context) VisualID() int {
 	return c.eglCtx.visualID
 }
 
+// DisableSRGB disables native sRGB surface creation. The renderer can emulate
+// sRGB when the native framebuffer is linear.
+func (c *Context) DisableSRGB() {
+	c.eglCtx.srgb = false
+}
+
 func (c *Context) CreateSurface(win NativeWindowType) error {
 	eglSurf, err := createSurface(c.disp, c.eglCtx, win)
 	c.eglSurf = eglSurf
@@ -173,14 +179,12 @@ func createContext(disp _EGLDisplay) (*eglContext, error) {
 		_EGL_RED_SIZE, 8,
 		_EGL_CONFIG_CAVEAT, _EGL_NONE,
 	}
-	if srgb {
-		if runtime.GOOS == "linux" || runtime.GOOS == "android" {
-			// Some Mesa drivers crash if an sRGB framebuffer is requested without alpha.
-			// https://bugs.freedesktop.org/show_bug.cgi?id=107782.
-			//
-			// Also, some Android devices (Samsung S9) need alpha for sRGB to work.
-			attribs = append(attribs, _EGL_ALPHA_SIZE, 8)
-		}
+	if runtime.GOOS == "android" || (srgb && runtime.GOOS == "linux") {
+		// Android needs alpha for EmbedOp even without native sRGB support.
+		// The native visual selected here replaces the SurfaceHolder's format.
+		// Some Mesa drivers also require alpha for sRGB framebuffers:
+		// https://bugs.freedesktop.org/show_bug.cgi?id=107782.
+		attribs = append(attribs, _EGL_ALPHA_SIZE, 8)
 	}
 	attribs = append(attribs, _EGL_NONE)
 	eglCfg, ret := eglChooseConfig(disp, attribs)
