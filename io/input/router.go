@@ -482,8 +482,18 @@ func (q *Router) processEvent(e event.Event, system bool) {
 		}
 		q.changeState(e, state, evts)
 	case transfer.DataEvent:
-		cstate, evts := q.cqueue.Push(state.clipboardState, e)
-		state.clipboardState = cstate
+		var evts []taggedEvent
+		if e.URI == "" {
+			var cstate clipboardState
+			cstate, evts = q.cqueue.Push(state.clipboardState, e)
+			state.clipboardState = cstate
+		} else {
+			for tag, h := range q.handlers {
+				if h.filter.pointer.Matches(e) {
+					evts = append(evts, taggedEvent{tag: tag, event: e})
+				}
+			}
+		}
 		q.changeState(e, state, evts)
 	default:
 		panic("unknown event type")
