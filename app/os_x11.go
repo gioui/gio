@@ -777,11 +777,10 @@ func (h *x11EventHandler) handleEvents() bool {
 			})
 		case C.SelectionRequest:
 			cevt := (*C.XSelectionRequestEvent)(unsafe.Pointer(xev))
-			if (cevt.selection != w.atoms.clipboard && cevt.selection != w.atoms.primary) || cevt.property == C.None {
-				// Unsupported clipboard or obsolete requestor.
-				break
-			}
-			notify := func() {
+			// reply tells the requestor that the data is in property, or,
+			// with None, that the request is refused. Every request needs
+			// a reply, or the requestor waits for it (ICCCM 2.2).
+			reply := func(property C.Atom) {
 				var xev C.XEvent
 				ev := (*C.XSelectionEvent)(unsafe.Pointer(&xev))
 				*ev = C.XSelectionEvent{
@@ -790,10 +789,16 @@ func (h *x11EventHandler) handleEvents() bool {
 					requestor: cevt.requestor,
 					selection: cevt.selection,
 					target:    cevt.target,
-					property:  cevt.property,
+					property:  property,
 					time:      cevt.time,
 				}
 				C.XSendEvent(w.x, cevt.requestor, 0, 0, &xev)
+			}
+			notify := func() { reply(cevt.property) }
+			if (cevt.selection != w.atoms.clipboard && cevt.selection != w.atoms.primary) || cevt.property == C.None {
+				// Unsupported clipboard or obsolete requestor.
+				reply(C.None)
+				break
 			}
 			switch cevt.target {
 			case w.atoms.targets:
@@ -827,6 +832,8 @@ func (h *x11EventHandler) handleEvents() bool {
 				notify()
 			case w.atoms.passwordManagerHint:
 				if !w.clipboard.sensitive {
+					// Offered only for sensitive content.
+					reply(C.None)
 					break
 				}
 				hint := []byte(passwordManagerHintValue)
@@ -835,6 +842,9 @@ func (h *x11EventHandler) handleEvents() bool {
 					(*C.uchar)(unsafe.Pointer(unsafe.SliceData(hint))), C.int(len(hint)),
 				)
 				notify()
+			default:
+				// A target that is not offered.
+				reply(C.None)
 			}
 		case C.ClientMessage: // extensions
 			cevt := (*C.XClientMessageEvent)(unsafe.Pointer(xev))
