@@ -43,6 +43,39 @@ func TestClipboardDuplicateEvent(t *testing.T) {
 	}
 }
 
+func TestExternalFileDropEvent(t *testing.T) {
+	var r Router
+	var target, other int
+	r.Event(transfer.TargetFilter{Target: &target, Type: "text/plain"})
+	r.Event(transfer.TargetFilter{Target: &other, Type: "application/octet-stream"})
+
+	r.Queue(transfer.DataEvent{
+		Type: "text/plain",
+		URI:  "file:///tmp/example.txt",
+		Open: func() io.ReadCloser {
+			return io.NopCloser(strings.NewReader("file"))
+		},
+	})
+
+	e, ok := r.Event(transfer.TargetFilter{Target: &target, Type: "text/plain"})
+	if !ok {
+		t.Fatal("file drop was not delivered")
+	}
+	de, ok := e.(transfer.DataEvent)
+	if !ok || de.URI != "file:///tmp/example.txt" {
+		t.Fatalf("unexpected file drop: %#v", e)
+	}
+	reader := de.Open()
+	defer reader.Close()
+	data, err := io.ReadAll(reader)
+	if err != nil || string(data) != "file" {
+		t.Fatalf("unexpected file data: %q, %v", data, err)
+	}
+	if _, ok := r.Event(transfer.TargetFilter{Target: &other, Type: "application/octet-stream"}); ok {
+		t.Fatal("file drop delivered to a non-matching target")
+	}
+}
+
 func TestQueueProcessReadClipboard(t *testing.T) {
 	ops, r, handler := new(op.Ops), new(Router), make([]int, 2)
 

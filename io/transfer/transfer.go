@@ -84,6 +84,9 @@ func (CancelEvent) ImplementsEvent() {}
 type DataEvent struct {
 	// Type is the MIME type of Data.
 	Type string
+	// URI identifies the transferred resource, if it has one. For local files,
+	// URI is a file URI.
+	URI string
 	// Open returns the transfer data. It is only valid to call Open in the frame
 	// the DataEvent is received. The caller must close the return value after use.
 	Open func() io.ReadCloser

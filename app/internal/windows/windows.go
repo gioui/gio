@@ -371,6 +371,7 @@ const (
 	WM_NCPOINTERUPDATE       = 0x0241
 	WM_NCPOINTERDOWN         = 0x0242
 	WM_NCPOINTERUP           = 0x0243
+	WM_DROPFILES             = 0x0233
 	WM_PAINT                 = 0x000F
 	WM_POINTERCAPTURECHANGED = 0x024C
 	WM_POINTERDOWN           = 0x0246
@@ -521,10 +522,45 @@ var (
 
 	dwmapi                        = syscall.NewLazySystemDLL("dwmapi")
 	_DwmExtendFrameIntoClientArea = dwmapi.NewProc("DwmExtendFrameIntoClientArea")
+
+	shell32          = syscall.NewLazySystemDLL("shell32")
+	_DragAcceptFiles = shell32.NewProc("DragAcceptFiles")
+	_DragQueryFileW  = shell32.NewProc("DragQueryFileW")
+	_DragFinish      = shell32.NewProc("DragFinish")
 )
 
 func AdjustWindowRectEx(r *Rect, dwStyle uint32, bMenu int, dwExStyle uint32) {
 	_AdjustWindowRectEx.Call(uintptr(unsafe.Pointer(r)), uintptr(dwStyle), uintptr(bMenu), uintptr(dwExStyle))
+}
+
+// DragAcceptFiles enables or disables file drops for a window.
+func DragAcceptFiles(hwnd syscall.Handle, accept bool) {
+	var enabled uintptr
+	if accept {
+		enabled = 1
+	}
+	_DragAcceptFiles.Call(uintptr(hwnd), enabled)
+}
+
+// DragQueryFiles returns the paths from a WM_DROPFILES handle and releases it.
+func DragQueryFiles(hDrop syscall.Handle) []string {
+	count, _, _ := _DragQueryFileW.Call(uintptr(hDrop), 0xffffffff, 0, 0)
+	paths := make([]string, 0, count)
+	for i := uintptr(0); i < count; i++ {
+		size, _, _ := _DragQueryFileW.Call(uintptr(hDrop), i, 0, 0)
+		if size == 0 {
+			continue
+		}
+		buf := make([]uint16, size+1)
+		if r, _, _ := _DragQueryFileW.Call(uintptr(hDrop), i, uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf))); r == 0 {
+			continue
+		}
+		if path := syscall.UTF16ToString(buf); path != "" {
+			paths = append(paths, path)
+		}
+	}
+	_DragFinish.Call(uintptr(hDrop))
+	return paths
 }
 
 func CallMsgFilter(m *Msg, nCode uintptr) bool {

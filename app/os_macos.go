@@ -744,6 +744,18 @@ func gio_onMouse(h C.uintptr_t, evt C.CFTypeRef, cdir C.int, cbtn C.NSInteger, x
 	})
 }
 
+//export gio_onFileDropPath
+func gio_onFileDropPath(h C.uintptr_t, path *C.char) {
+	if path == nil {
+		return
+	}
+	p := C.GoString(path)
+	if p == "" {
+		return
+	}
+	windowFor(h).ProcessEvent(fileDropEvent(p))
+}
+
 //export gio_onDraw
 func gio_onDraw(h C.uintptr_t) {
 	w := windowFor(h)

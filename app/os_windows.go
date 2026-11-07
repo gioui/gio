@@ -204,6 +204,7 @@ func (w *window) init() error {
 	if err := windows.RegisterTouchWindow(hwnd, 0); err != nil {
 		return err
 	}
+	windows.DragAcceptFiles(hwnd, true)
 	if err := windows.EnableMouseInPointer(1); err != nil {
 		return err
 	}
@@ -382,6 +383,12 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 			return 0
 		}
 		szp.Rgrc[0] = mi.WorkArea
+		return 0
+	case windows.WM_DROPFILES:
+		paths := windows.DragQueryFiles(syscall.Handle(wParam))
+		for _, path := range paths {
+			w.ProcessEvent(fileDropEvent(path))
+		}
 		return 0
 	case windows.WM_PAINT:
 		w.draw(true)
