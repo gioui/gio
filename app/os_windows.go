@@ -213,6 +213,7 @@ func (w *window) init() error {
 		return err
 	}
 	w.hwnd = hwnd
+	w.ShowTextInput(false)
 	return nil
 }
 
@@ -1058,7 +1059,20 @@ func loadCursor(cursor pointer.Cursor) (syscall.Handle, error) {
 	}
 }
 
-func (w *window) ShowTextInput(show bool) {}
+func (w *window) ShowTextInput(show bool) {
+	if show {
+		windows.ImmAssociateContextEx(w.hwnd, 0, windows.IACE_DEFAULT)
+		return
+	}
+	imc := windows.ImmGetContext(w.hwnd)
+	if imc == 0 {
+		return
+	}
+	// Close the candidate window before detaching the input context.
+	windows.ImmNotifyIME(imc, windows.NI_COMPOSITIONSTR, windows.CPS_CANCEL, 0)
+	windows.ImmReleaseContext(w.hwnd, imc)
+	windows.ImmAssociateContextEx(w.hwnd, 0, 0)
+}
 
 func (w *window) SetInputHint(_ key.InputHint) {}
 
