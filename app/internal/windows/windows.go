@@ -223,6 +223,8 @@ const (
 	HTBOTTOMLEFT  = 16
 	HTBOTTOMRIGHT = 17
 
+	IACE_DEFAULT = 0x0010
+
 	IDC_APPSTARTING = 32650 // Standard arrow and small hourglass
 	IDC_ARROW       = 32512 // Standard arrow
 	IDC_CROSS       = 32515 // Crosshair
@@ -512,6 +514,7 @@ var (
 	_GetDeviceCaps = gdi32.NewProc("GetDeviceCaps")
 
 	imm32                    = syscall.NewLazySystemDLL("imm32")
+	_ImmAssociateContextEx   = imm32.NewProc("ImmAssociateContextEx")
 	_ImmGetContext           = imm32.NewProc("ImmGetContext")
 	_ImmGetCompositionString = imm32.NewProc("ImmGetCompositionStringW")
 	_ImmNotifyIME            = imm32.NewProc("ImmNotifyIME")
@@ -751,6 +754,11 @@ func GetWindowLong(hwnd syscall.Handle, index uintptr) (val uintptr) {
 		val, _, _ = _GetWindowLong.Call(uintptr(hwnd), index)
 	}
 	return
+}
+
+func ImmAssociateContextEx(hwnd, imc syscall.Handle, flags uint32) bool {
+	r, _, _ := _ImmAssociateContextEx.Call(uintptr(hwnd), uintptr(imc), uintptr(flags))
+	return r != 0
 }
 
 func ImmGetContext(hwnd syscall.Handle) syscall.Handle {
