@@ -17,7 +17,8 @@ type Content struct {
 // WriteCmd copies Data to the clipboard.
 type WriteCmd struct {
 	// Type is the MIME type of Data. All platforms support "application/text"
-	// and "text/plain".
+	// and "text/plain". Windows also supports "image/png", "text/html",
+	// "application/rtf", and "text/rtf".
 	Type string
 	Data io.ReadCloser
 	// Sensitive marks Data as a secret, such as a password. Where the

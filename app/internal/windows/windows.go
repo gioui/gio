@@ -425,7 +425,9 @@ const (
 
 	GHND = 0x0042
 
+	CF_DIB         = 8
 	CF_UNICODETEXT = 13
+	CF_DIBV5       = 17
 	IMAGE_BITMAP   = 0
 	IMAGE_ICON     = 1
 	IMAGE_CURSOR   = 2
@@ -447,6 +449,7 @@ var (
 	_GlobalAlloc      = kernel32.NewProc("GlobalAlloc")
 	_GlobalFree       = kernel32.NewProc("GlobalFree")
 	_GlobalLock       = kernel32.NewProc("GlobalLock")
+	_GlobalSize       = kernel32.NewProc("GlobalSize")
 	_GlobalUnlock     = kernel32.NewProc("GlobalUnlock")
 
 	user32                        = syscall.NewLazySystemDLL("user32.dll")
@@ -463,6 +466,7 @@ var (
 	_GetWindowRect                = user32.NewProc("GetWindowRect")
 	_GetClientRect                = user32.NewProc("GetClientRect")
 	_GetClipboardData             = user32.NewProc("GetClipboardData")
+	_IsClipboardFormatAvailable   = user32.NewProc("IsClipboardFormatAvailable")
 	_GetDC                        = user32.NewProc("GetDC")
 	_GetDpiForWindow              = user32.NewProc("GetDpiForWindow")
 	_GetKeyState                  = user32.NewProc("GetKeyState")
@@ -649,6 +653,11 @@ func GetClipboardData(format uint32) (syscall.Handle, error) {
 		return 0, fmt.Errorf("GetClipboardData: %v", err)
 	}
 	return syscall.Handle(r), nil
+}
+
+func IsClipboardFormatAvailable(format uint32) bool {
+	r, _, _ := _IsClipboardFormatAvailable.Call(uintptr(format))
+	return r != 0
 }
 
 func GetDC(hwnd syscall.Handle) (syscall.Handle, error) {
@@ -860,6 +869,14 @@ func GlobalLock(h syscall.Handle) (unsafe.Pointer, error) {
 
 func GlobalUnlock(h syscall.Handle) {
 	_GlobalUnlock.Call(uintptr(h))
+}
+
+func GlobalSize(h syscall.Handle) (int, error) {
+	r, _, err := _GlobalSize.Call(uintptr(h))
+	if r == 0 || r > uintptr(^uint(0)>>1) {
+		return 0, fmt.Errorf("GlobalSize: %v", err)
+	}
+	return int(r), nil
 }
 
 func KillTimer(hwnd syscall.Handle, nIDEvent uintptr) error {
