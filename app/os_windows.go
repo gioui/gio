@@ -826,14 +826,17 @@ func (w *window) NewContext() (context, error) {
 	return nil, errors.New("NewContext: no available GPU drivers")
 }
 
-func (w *window) ReadClipboard() {
-	w.readClipboard()
+func (w *window) ReadClipboard(mime string) {
+	if !readClipboardText(w, mime) {
+		return
+	}
+	w.readClipboard(mime)
 }
 
-func (w *window) readClipboard() (cerr error) {
+func (w *window) readClipboard(mime string) (cerr error) {
 	defer func() {
 		if cerr != nil {
-			w.processDataEvent("")
+			w.processDataEvent(mime, "")
 		}
 	}()
 
@@ -851,13 +854,13 @@ func (w *window) readClipboard() (cerr error) {
 	}
 	defer windows.GlobalUnlock(mem)
 	content := gowindows.UTF16PtrToString((*uint16)(unsafe.Pointer(ptr)))
-	w.processDataEvent(content)
+	w.processDataEvent(mime, content)
 	return nil
 }
 
-func (w *window) processDataEvent(content string) {
+func (w *window) processDataEvent(mime, content string) {
 	w.ProcessEvent(transfer.DataEvent{
-		Type: "application/text",
+		Type: mime,
 		Open: func() io.ReadCloser {
 			return io.NopCloser(strings.NewReader(content))
 		},
@@ -948,7 +951,11 @@ func (w *window) Configure(options []Option) {
 }
 
 func (w *window) WriteClipboard(c clipboardContent) {
-	w.writeClipboard(string(c.data), c.sensitive)
+	data, ok := c.text()
+	if !ok {
+		return
+	}
+	w.writeClipboard(string(data), c.sensitive)
 }
 
 func (w *window) writeClipboard(s string, sensitive bool) error {

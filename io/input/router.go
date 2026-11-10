@@ -560,8 +560,12 @@ func (q *Router) executeCommand(c Command) stateChange {
 		state.pointerState, evts = q.pointer.queue.offerData(q.handlers, state.pointerState, req)
 	case clipboard.WriteCmd:
 		q.cqueue.ProcessWriteClipboard(req)
+	case clipboard.WriteContentsCmd:
+		q.cqueue.ProcessWriteContents(req)
+	case clipboard.ReadContentsCmd:
+		state.clipboardState = q.cqueue.ProcessReadContents(state.clipboardState, req)
 	case clipboard.ReadCmd:
-		state.clipboardState = q.cqueue.ProcessReadClipboard(state.clipboardState, req.Tag)
+		state.clipboardState = q.cqueue.ProcessReadClipboard(state.clipboardState, req)
 	case pointer.GrabCmd:
 		state.pointerState, evts = q.pointer.queue.grab(state.pointerState, req)
 	case op.InvalidateCmd:
@@ -732,14 +736,18 @@ func (q *Router) TextInputHint() (key.InputHint, bool) {
 	return q.key.queue.InputHint(q.handlers, q.state().keyState)
 }
 
-// WriteClipboard returns the most recent content to be copied
-// to the clipboard, if any.
+// WriteClipboard returns the first representation of a pending clipboard write.
 func (q *Router) WriteClipboard() (mime string, content []byte, ok bool) {
 	return q.cqueue.WriteClipboard()
 }
 
-// ClipboardSensitive reports whether the content most recently returned by
-// WriteClipboard is marked as sensitive, see [clipboard.WriteCmd].
+// WriteClipboardContents returns the pending clipboard representations, if any.
+func (q *Router) WriteClipboardContents() ([]clipboard.Content, bool) {
+	return q.cqueue.WriteContents()
+}
+
+// ClipboardSensitive reports whether the most recent clipboard write is marked
+// sensitive, see [clipboard.WriteCmd].
 func (q *Router) ClipboardSensitive() bool {
 	return q.cqueue.sensitive
 }
@@ -748,6 +756,17 @@ func (q *Router) ClipboardSensitive() bool {
 // to read the clipboard.
 func (q *Router) ClipboardRequested() bool {
 	return q.cqueue.ClipboardRequested(q.lastState().clipboardState)
+}
+
+// ClipboardTypes returns the MIME types requested by pending clipboard reads.
+func (q *Router) ClipboardTypes() []string {
+	var types []string
+	for _, req := range q.lastState().receivers {
+		if !slices.Contains(types, req.Type) {
+			types = append(types, req.Type)
+		}
+	}
+	return types
 }
 
 // Cursor returns the last cursor set.

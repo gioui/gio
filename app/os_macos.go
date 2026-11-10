@@ -406,14 +406,17 @@ func (w *window) contextView() C.CFTypeRef {
 	return w.view
 }
 
-func (w *window) ReadClipboard() {
+func (w *window) ReadClipboard(mime string) {
+	if !readClipboardText(w, mime) {
+		return
+	}
 	cstr := C.readClipboard()
 	if cstr != 0 {
 		defer C.CFRelease(cstr)
 	}
 	content := nsstringToString(cstr)
 	w.ProcessEvent(transfer.DataEvent{
-		Type: "application/text",
+		Type: mime,
 		Open: func() io.ReadCloser {
 			return io.NopCloser(strings.NewReader(content))
 		},
@@ -421,7 +424,11 @@ func (w *window) ReadClipboard() {
 }
 
 func (w *window) WriteClipboard(c clipboardContent) {
-	cstr := stringToNSString(string(c.data))
+	data, ok := c.text()
+	if !ok {
+		return
+	}
+	cstr := stringToNSString(string(data))
 	defer C.CFRelease(cstr)
 	var sens C.int
 	if c.sensitive {

@@ -6,6 +6,7 @@ package app
 
 import (
 	"bytes"
+	stdcontext "context"
 	"errors"
 	"fmt"
 	"image"
@@ -98,9 +99,10 @@ type wlDisplay struct {
 		read, write int
 	}
 
-	repeat        repeatState
-	poller        poller
-	readClipClose chan struct{}
+	repeat          repeatState
+	poller          poller
+	clipReadContext stdcontext.Context
+	clipReadCancel  stdcontext.CancelFunc
 }
 
 type wlSeat struct {
@@ -1061,34 +1063,45 @@ func gio_onPointerAxisDiscrete(data unsafe.Pointer, p *C.struct_wl_pointer, axis
 	}
 }
 
-func (w *window) ReadClipboard() {
-	if w.disp.readClipClose != nil {
+func (w *window) ReadClipboard(mime string) {
+	if !readClipboardText(w, mime) {
 		return
 	}
-	w.disp.readClipClose = make(chan struct{})
 	r, err := w.disp.readClipboard()
 	if r == nil || err != nil {
+		w.ProcessEvent(transfer.DataEvent{Type: mime, Open: func() io.ReadCloser {
+			return io.NopCloser(bytes.NewReader(nil))
+		}})
 		return
 	}
-	// Don't let slow clipboard transfers block event loop.
+	ctx := w.disp.clipReadContext
+	stop := stdcontext.AfterFunc(ctx, func() { r.Close() })
+	// Don't let slow clipboard transfers block the event loop.
 	go func() {
+		defer stop()
 		defer r.Close()
-		data, _ := io.ReadAll(r)
+		data, err := io.ReadAll(r)
+		if err != nil {
+			data = nil
+		}
 		e := transfer.DataEvent{
-			Type: "application/text",
+			Type: mime,
 			Open: func() io.ReadCloser {
 				return io.NopCloser(bytes.NewReader(data))
 			},
 		}
 		select {
 		case w.clipReads <- e:
-			w.disp.wakeup()
-		case <-w.disp.readClipClose:
+			w.w.w.Invalidate()
+		case <-ctx.Done():
 		}
 	}()
 }
 
 func (w *window) WriteClipboard(c clipboardContent) {
+	if _, ok := c.text(); !ok {
+		return
+	}
 	w.disp.writeClipboard(c)
 }
 
@@ -1431,13 +1444,18 @@ func (w *window) dispatch() {
 		w.w.Invalidate()
 		return
 	}
+	select {
+	case e := <-w.clipReads:
+		w.ProcessEvent(e)
+		return
+	default:
+	}
 	if err := w.disp.dispatch(); err != nil || w.closing {
 		w.close(err)
 		return
 	}
 	select {
 	case e := <-w.clipReads:
-		w.disp.readClipClose = nil
 		w.ProcessEvent(e)
 	case <-w.wakeups:
 		w.w.Invalidate()
@@ -1810,7 +1828,7 @@ func gio_onDataSourceTarget(data unsafe.Pointer, source *C.struct_wl_data_source
 //export gio_onDataSourceSend
 func gio_onDataSourceSend(data unsafe.Pointer, source *C.struct_wl_data_source, mime *C.char, fd C.int32_t) {
 	s := callbackLoad(data).(*wlSeat)
-	content := s.content.data
+	content, _ := s.content.text()
 	if C.GoString(mime) == passwordManagerHintType {
 		// The hint is all a clipboard manager asking for it gets, never the
 		// content.
@@ -2153,6 +2171,7 @@ func newWLDisplay() (*wlDisplay, error) {
 		outputMap:    make(map[C.uint32_t]*C.struct_wl_output),
 		outputConfig: make(map[*C.struct_wl_output]*wlOutput),
 	}
+	d.clipReadContext, d.clipReadCancel = stdcontext.WithCancel(stdcontext.Background())
 	pipe := make([]int, 2)
 	if err := syscall.Pipe2(pipe, syscall.O_NONBLOCK|syscall.O_CLOEXEC); err != nil {
 		return nil, fmt.Errorf("wayland: failed to create pipe: %v", err)
@@ -2188,9 +2207,8 @@ func newWLDisplay() (*wlDisplay, error) {
 }
 
 func (d *wlDisplay) destroy() {
-	if d.readClipClose != nil {
-		close(d.readClipClose)
-		d.readClipClose = nil
+	if d.clipReadCancel != nil {
+		d.clipReadCancel()
 	}
 	if d.notify.write != 0 {
 		syscall.Close(d.notify.write)

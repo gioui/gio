@@ -8,8 +8,16 @@ import (
 	"gioui.org/io/event"
 )
 
-// WriteCmd copies Text to the clipboard.
+// Content is one clipboard representation. Type is the MIME type of Data.
+type Content struct {
+	Type string
+	Data []byte
+}
+
+// WriteCmd copies Data to the clipboard.
 type WriteCmd struct {
+	// Type is the MIME type of Data. All platforms support "application/text"
+	// and "text/plain".
 	Type string
 	Data io.ReadCloser
 	// Sensitive marks Data as a secret, such as a password. Where the
@@ -38,11 +46,34 @@ type WriteCmd struct {
 	Sensitive bool
 }
 
-// ReadCmd requests the text of the clipboard, delivered to
-// the handler through an [io/transfer.DataEvent].
-type ReadCmd struct {
-	Tag event.Tag
+// WriteContentsCmd replaces the clipboard with all the supplied
+// representations at once. See [WriteCmd] for supported types.
+// Each Type should occur at most once. An empty Contents slice clears the clipboard.
+type WriteContentsCmd struct {
+	Contents []Content
+	// Sensitive marks all contents as secret. See [WriteCmd.Sensitive].
+	Sensitive bool
 }
 
-func (WriteCmd) ImplementsCommand() {}
-func (ReadCmd) ImplementsCommand()  {}
+// ReadContentsCmd requests several clipboard representations at once. The
+// target receives one [io/transfer.DataEvent] for each requested type.
+// Unsupported types produce an empty reader. An empty Types slice requests
+// "application/text".
+type ReadContentsCmd struct {
+	Tag   event.Tag
+	Types []string
+}
+
+// ReadCmd requests clipboard data, delivered through an [io/transfer.DataEvent].
+// If the requested type is unavailable, the event contains an empty reader.
+type ReadCmd struct {
+	Tag event.Tag
+	// Type is the MIME type to read. An empty Type requests "application/text".
+	// Supported types are the same as for [WriteCmd].
+	Type string
+}
+
+func (WriteCmd) ImplementsCommand()         {}
+func (WriteContentsCmd) ImplementsCommand() {}
+func (ReadContentsCmd) ImplementsCommand()  {}
+func (ReadCmd) ImplementsCommand()          {}
