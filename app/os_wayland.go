@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -134,8 +135,6 @@ type wlSeat struct {
 	offers map[*C.struct_wl_data_offer][]string
 	// clipboard is the wl_data_offer for the clipboard.
 	clipboard *C.struct_wl_data_offer
-	// mimeType is the chosen mime type of clipboard.
-	mimeType string
 	// source represents the clipboard content of the most recent
 	// clipboard write, if any.
 	source *C.struct_wl_data_source
@@ -250,9 +249,7 @@ type wlOutput struct {
 // in C is forbidden.
 var callbackMap sync.Map
 
-// clipboardMimeTypes is a list of supported clipboard mime types, in
-// order of preference.
-var clipboardMimeTypes = []string{"text/plain;charset=utf8", "UTF8_STRING", "text/plain", "TEXT", "STRING"}
+var clipboardTextTypes = []string{"text/plain;charset=utf-8", "text/plain;charset=utf8", "UTF8_STRING", "text/plain", "TEXT", "STRING"}
 
 var (
 	newWaylandEGLContext    func(w *window) (context, error)
@@ -303,24 +300,32 @@ func (d *wlDisplay) writeClipboard(content clipboardContent) error {
 	if d.dataDeviceManager == nil || s.dataDev == nil {
 		return nil
 	}
+	contents := content.contents
+	if len(contents) == 0 {
+		C.wl_data_device_set_selection(s.dataDev, nil, s.serial)
+		return nil
+	}
 	s.content = content
 	s.source = C.wl_data_device_manager_create_data_source(d.dataDeviceManager)
 	C.wl_data_source_add_listener(s.source, &C.gio_data_source_listener, unsafe.Pointer(s.seat))
-	// The hint is offered before the content, like the markers on the
-	// other platforms.
+	// Offer the sensitivity hint before the content.
 	if content.sensitive {
 		hint := C.CString(passwordManagerHintType)
 		C.wl_data_source_offer(s.source, hint)
 		C.free(unsafe.Pointer(hint))
 	}
-	for _, mime := range clipboardMimeTypes {
-		C.wl_data_source_offer(s.source, C.CString(mime))
+	for _, c := range contents {
+		for _, mime := range waylandTypes(c.Type) {
+			cmime := C.CString(mime)
+			C.wl_data_source_offer(s.source, cmime)
+			C.free(unsafe.Pointer(cmime))
+		}
 	}
 	C.wl_data_device_set_selection(s.dataDev, s.source, s.serial)
 	return nil
 }
 
-func (d *wlDisplay) readClipboard() (io.ReadCloser, error) {
+func (d *wlDisplay) readClipboard(mime string) (io.ReadCloser, error) {
 	s := d.seat
 	if s == nil {
 		return nil, nil
@@ -328,17 +333,40 @@ func (d *wlDisplay) readClipboard() (io.ReadCloser, error) {
 	if s.clipboard == nil {
 		return nil, nil
 	}
+	var offered string
+loop:
+	for _, want := range waylandTypes(mime) {
+		for _, got := range s.offers[s.clipboard] {
+			if want == got {
+				offered = got
+				break loop
+			}
+		}
+	}
+	if offered == "" {
+		return nil, nil
+	}
 	r, w, err := os.Pipe()
 	if err != nil {
 		return nil, err
 	}
-	// wl_data_offer_receive performs and implicit dup(2) of the write end
+	// wl_data_offer_receive performs an implicit dup(2) of the write end
 	// of the pipe. Close our version.
 	defer w.Close()
-	cmimeType := C.CString(s.mimeType)
+	cmimeType := C.CString(offered)
 	defer C.free(unsafe.Pointer(cmimeType))
 	C.wl_data_offer_receive(s.clipboard, cmimeType, C.int(w.Fd()))
 	return r, nil
+}
+
+func waylandTypes(mime string) []string {
+	if mime == "application/text" || mime == "text/plain" {
+		return clipboardTextTypes
+	}
+	if mime == "application/rtf" || mime == "text/rtf" {
+		return []string{"application/rtf", "text/rtf"}
+	}
+	return []string{mime}
 }
 
 func (d *wlDisplay) createNativeWindow(options []Option) (*window, error) {
@@ -789,18 +817,7 @@ func gio_onDataDeviceDrop(data unsafe.Pointer, dataDev *C.struct_wl_data_device)
 func gio_onDataDeviceSelection(data unsafe.Pointer, dataDev *C.struct_wl_data_device, id *C.struct_wl_data_offer) {
 	s := callbackLoad(data).(*wlSeat)
 	defer s.flushOffers()
-	s.clipboard = nil
-loop:
-	for _, want := range clipboardMimeTypes {
-		for _, got := range s.offers[id] {
-			if want != got {
-				continue
-			}
-			s.clipboard = id
-			s.mimeType = got
-			break loop
-		}
-	}
+	s.clipboard = id
 }
 
 //export gio_onRegistryGlobalRemove
@@ -1064,10 +1081,7 @@ func gio_onPointerAxisDiscrete(data unsafe.Pointer, p *C.struct_wl_pointer, axis
 }
 
 func (w *window) ReadClipboard(mime string) {
-	if !readClipboardText(w, mime) {
-		return
-	}
-	r, err := w.disp.readClipboard()
+	r, err := w.disp.readClipboard(mime)
 	if r == nil || err != nil {
 		w.ProcessEvent(transfer.DataEvent{Type: mime, Open: func() io.ReadCloser {
 			return io.NopCloser(bytes.NewReader(nil))
@@ -1099,9 +1113,6 @@ func (w *window) ReadClipboard(mime string) {
 }
 
 func (w *window) WriteClipboard(c clipboardContent) {
-	if _, ok := c.text(); !ok {
-		return
-	}
 	w.disp.writeClipboard(c)
 }
 
@@ -1828,18 +1839,27 @@ func gio_onDataSourceTarget(data unsafe.Pointer, source *C.struct_wl_data_source
 //export gio_onDataSourceSend
 func gio_onDataSourceSend(data unsafe.Pointer, source *C.struct_wl_data_source, mime *C.char, fd C.int32_t) {
 	s := callbackLoad(data).(*wlSeat)
-	content, _ := s.content.text()
-	if C.GoString(mime) == passwordManagerHintType {
+	typeName := C.GoString(mime)
+	var content []byte
+	if typeName == passwordManagerHintType {
 		// The hint is all a clipboard manager asking for it gets, never the
 		// content.
-		content = nil
 		if s.content.sensitive {
 			content = []byte(passwordManagerHintValue)
 		}
+	} else {
+		contents := s.content.contents
+		for _, c := range contents {
+			if slices.Contains(waylandTypes(c.Type), typeName) {
+				content = c.Data
+				break
+			}
+		}
 	}
 	go func() {
-		defer syscall.Close(int(fd))
-		syscall.Write(int(fd), content)
+		f := os.NewFile(uintptr(fd), "clipboard")
+		defer f.Close()
+		f.Write(content)
 	}()
 }
 
