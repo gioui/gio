@@ -18,6 +18,7 @@ import (
 	"sync"
 	"time"
 	"unicode"
+	"unicode/utf16"
 	"unicode/utf8"
 	"unsafe"
 
@@ -49,6 +50,10 @@ type window struct {
 
 	animating bool
 
+	// highSurrogate holds the first half of a UTF-16 surrogate pair until
+	// the WM_CHAR with its second half arrives.
+	highSurrogate rune
+
 	borderSize image.Point
 	config     Config
 	// frameDims stores the last seen window frame width and height.
@@ -57,6 +62,13 @@ type window struct {
 }
 
 const _WM_WAKEUP = windows.WM_USER + iota
+
+// UTF-16 surrogate ranges, from unicode/utf16.
+const (
+	surr1 = 0xd800
+	surr2 = 0xdc00
+	surr3 = 0xe000
+)
 
 const copyDataURLType = 0xffffff00
 
@@ -268,7 +280,19 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		}
 		fallthrough
 	case windows.WM_CHAR:
-		if r := rune(wParam); unicode.IsPrint(r) {
+		// Surrogate pairs arrive as two WM_CHAR messages, high bits first.
+		r := rune(wParam)
+		switch {
+		// Handle first half of a surrogate pair.
+		case surr1 <= r && r < surr2:
+			w.highSurrogate = r
+			return windows.TRUE
+		// Handle second half of a surrogate pair.
+		case surr2 <= r && r < surr3:
+			r = utf16.DecodeRune(w.highSurrogate, r)
+		}
+		w.highSurrogate = 0
+		if unicode.IsPrint(r) {
 			w.w.EditorInsert(string(r))
 		}
 		// The message is processed.
