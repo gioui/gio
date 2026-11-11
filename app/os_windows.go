@@ -893,16 +893,18 @@ func (w *window) Configure(options []Option) {
 	metric := configForDPI(dpi)
 	cnf := w.config
 	cnf.apply(metric, options)
+	decorated := w.config.Decorated
 	w.config.Title = cnf.Title
 	w.config.Decorated = cnf.Decorated
 	w.config.MinSize = cnf.MinSize
 	w.config.MaxSize = cnf.MaxSize
 	windows.SetWindowText(w.hwnd, cnf.Title)
 
-	style := windows.GetWindowLong(w.hwnd, windows.GWL_STYLE)
+	oldStyle := windows.GetWindowLong(w.hwnd, windows.GWL_STYLE)
+	style := oldStyle
 	var showMode int32
 	var x, y, width, height int32
-	swpStyle := uintptr(windows.SWP_FRAMECHANGED)
+	swpStyle := uintptr(windows.SWP_NOMOVE | windows.SWP_NOSIZE)
 	if cnf.TopMost == w.config.TopMost {
 		// Don't change the z-order if TopMost didn't change.
 		swpStyle |= windows.SWP_NOZORDER
@@ -917,12 +919,10 @@ func (w *window) Configure(options []Option) {
 	switch cnf.Mode {
 	case Minimized:
 		style |= winStyle
-		swpStyle |= windows.SWP_NOMOVE | windows.SWP_NOSIZE
 		showMode = windows.SW_SHOWMINIMIZED
 
 	case Maximized:
 		style |= winStyle
-		swpStyle |= windows.SWP_NOMOVE | windows.SWP_NOSIZE
 		showMode = windows.SW_SHOWMAXIMIZED
 
 	case Windowed:
@@ -949,9 +949,11 @@ func (w *window) Configure(options []Option) {
 			// Enable drop shadows when we draw decorations.
 			windows.DwmExtendFrameIntoClientArea(w.hwnd, windows.Margins{-1, -1, -1, -1})
 		}
+		if wr.Right-wr.Left != width || wr.Bottom-wr.Top != height {
+			swpStyle &^= windows.SWP_NOMOVE | windows.SWP_NOSIZE
+		}
 
 	case Fullscreen:
-		swpStyle |= windows.SWP_NOMOVE | windows.SWP_NOSIZE
 		showMode = windows.SW_SHOWMAXIMIZED
 	}
 
@@ -966,9 +968,25 @@ func (w *window) Configure(options []Option) {
 
 	// Note: these invocation all trigger the windows callback method which may process a pending system.ActionCenter
 	// action, so SetWindowPos should come first so as to not "overwrite" system.ActionCenter.
+	if style != oldStyle || cnf.Decorated != decorated {
+		swpStyle |= windows.SWP_FRAMECHANGED
+	}
 	windows.SetWindowPos(w.hwnd, hwndAfter, x, y, width, height, swpStyle)
 	windows.SetWindowLong(w.hwnd, windows.GWL_STYLE, style)
-	windows.ShowWindow(w.hwnd, showMode)
+	// ShowWindow(SW_SHOWNORMAL) moves a snapped window back to its unsnapped
+	// position, so skip it when the window is already in the requested state.
+	p := windows.GetWindowPlacement(w.hwnd)
+	shown := int32(windows.SW_SHOWNORMAL)
+	switch {
+	case p.IsMinimized():
+		shown = windows.SW_SHOWMINIMIZED
+	case p.IsMaximized():
+		shown = windows.SW_SHOWMAXIMIZED
+	}
+	// GetWindowPlacement reports SW_SHOWNORMAL for a window not yet shown.
+	if oldStyle&windows.WS_VISIBLE == 0 || shown != showMode {
+		windows.ShowWindow(w.hwnd, showMode)
+	}
 }
 
 func (w *window) WriteClipboard(c clipboardContent) {
