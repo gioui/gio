@@ -557,7 +557,7 @@ func (q *Router) executeCommand(c Command) stateChange {
 	case key.SnippetCmd:
 		state.keyState = q.key.queue.setSnippet(state.keyState, req)
 	case transfer.OfferCmd:
-		state.pointerState, evts = q.pointer.queue.offerData(q.handlers, state.pointerState, req)
+		state.pointerState, evts = q.pointer.queue.offer(q.handlers, state.pointerState, req)
 	case clipboard.WriteCmd:
 		q.cqueue.ProcessWriteClipboard(req)
 	case clipboard.ReadCmd:

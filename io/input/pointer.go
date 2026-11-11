@@ -59,6 +59,7 @@ type pointerInfo struct {
 
 	dataSource event.Tag // dragging source tag
 	dataTarget event.Tag // dragging target tag
+	types      []string
 }
 
 type pointerHandler struct {
@@ -399,25 +400,32 @@ func (c *pointerCollector) cursor(cursor pointer.Cursor) {
 	area.cursor = cursor
 }
 
-func (q *pointerQueue) offerData(handlers map[event.Tag]*handler, state pointerState, req transfer.OfferCmd) (pointerState, []taggedEvent) {
+func (q *pointerQueue) offer(handlers map[event.Tag]*handler, state pointerState, req transfer.OfferCmd) (pointerState, []taggedEvent) {
 	var evts []taggedEvent
 	for i, p := range state.pointers {
 		if p.dataSource != req.Tag {
 			continue
 		}
-		if p.dataTarget != nil {
-			evts = append(evts, taggedEvent{tag: p.dataTarget, event: transfer.DataEvent{
-				Type: req.Type,
-				Open: func() io.ReadCloser {
-					return req.Data
-				},
-			}})
+		if h, ok := handlers[p.dataSource]; ok {
+			p.types = h.filter.pointer.sourceMimes
 		}
 		state.pointers = slices.Clone(state.pointers)
-		state.pointers[i], evts = q.deliverTransferCancelEvent(handlers, p, evts)
+		state.pointers[i], evts = q.offerData(handlers, p, transfer.DataEvent{
+			Type: req.Type,
+			Open: func() io.ReadCloser {
+				return req.Data
+			},
+		}, evts)
 		break
 	}
 	return state, evts
+}
+
+func (q *pointerQueue) offerData(handlers map[event.Tag]*handler, p pointerInfo, data transfer.DataEvent, evts []taggedEvent) (pointerInfo, []taggedEvent) {
+	if p.dataTarget != nil {
+		evts = append(evts, taggedEvent{tag: p.dataTarget, event: data})
+	}
+	return q.deliverTransferCancelEvent(handlers, p, evts)
 }
 
 func (c *pointerCollector) Reset() {
@@ -824,14 +832,20 @@ func (q *pointerQueue) deliverEvent(handlers map[event.Tag]*handler, p pointerIn
 
 func (q *pointerQueue) deliverEnterLeaveEvents(handlers map[event.Tag]*handler, cursor pointer.Cursor, p pointerInfo, evts []taggedEvent, e pointer.Event) (pointerInfo, []taggedEvent, pointer.Cursor, bool) {
 	changed := false
+	if p.dataSource != nil {
+		var types []string
+		if h, ok := handlers[p.dataSource]; ok {
+			types = h.filter.pointer.sourceMimes
+		}
+		if !slices.Equal(p.types, types) {
+			p.types = slices.Clone(types)
+			changed = true
+		}
+	}
 	var hits []event.Tag
 	if e.Kind == pointer.Leave || e.Source != pointer.Mouse && !p.pressed && e.Kind != pointer.Press {
 		// Consider non-mouse pointers leaving when they're released.
 	} else {
-		var transSrc *pointerFilter
-		if p.dataSource != nil {
-			transSrc = &handlers[p.dataSource].filter.pointer
-		}
 		cursor = q.hitTest(e.Position, func(n *hitNode) bool {
 			h, ok := handlers[n.tag]
 			if !ok {
@@ -845,10 +859,8 @@ func (q *pointerQueue) deliverEnterLeaveEvents(handlers map[event.Tag]*handler, 
 				if _, found := searchTag(p.handlers, n.tag); found {
 					add = true
 				}
-				if transSrc != nil {
-					if _, ok := firstMimeMatch(transSrc, &h.filter.pointer); ok {
-						add = true
-					}
+				if _, ok := firstMimeMatch(p.types, &h.filter.pointer); ok {
+					add = true
 				}
 			}
 			if add {
@@ -913,12 +925,8 @@ func (q *pointerQueue) deliverDragEvent(handlers map[event.Tag]*handler, p point
 		}
 		// One data source handler per pointer.
 		p.dataSource = k
-		// Notify all potential targets.
-		for k, tgt := range handlers {
-			if _, ok := firstMimeMatch(src, &tgt.filter.pointer); ok {
-				evts = append(evts, taggedEvent{tag: k, event: transfer.InitiateEvent{}})
-			}
-		}
+		p.types = slices.Clone(src.sourceMimes)
+		evts = q.initiateTransfer(handlers, p.types, evts)
 		break
 	}
 	return p, evts
@@ -928,31 +936,49 @@ func (q *pointerQueue) deliverDropEvent(handlers map[event.Tag]*handler, p point
 	if p.dataSource == nil {
 		return p, evts
 	}
-	// Request data from the source.
-	src := &handlers[p.dataSource].filter.pointer
-	for _, k := range p.entered {
-		h := handlers[k]
-		if m, ok := firstMimeMatch(src, &h.filter.pointer); ok {
-			p.dataTarget = k
-			evts = append(evts, taggedEvent{tag: p.dataSource, event: transfer.RequestEvent{Type: m}})
-			return p, evts
+	var mime string
+	p.dataTarget, mime = q.transferTarget(handlers, p.types, p.entered)
+	if p.dataTarget != nil {
+		evts = append(evts, taggedEvent{tag: p.dataSource, event: transfer.RequestEvent{Type: mime}})
+	} else {
+		p, evts = q.deliverTransferCancelEvent(handlers, p, evts)
+	}
+	return p, evts
+}
+
+func (q *pointerQueue) initiateTransfer(handlers map[event.Tag]*handler, types []string, evts []taggedEvent) []taggedEvent {
+	for k, h := range handlers {
+		if _, ok := firstMimeMatch(types, &h.filter.pointer); ok {
+			evts = append(evts, taggedEvent{tag: k, event: transfer.InitiateEvent{}})
 		}
 	}
-	// No valid target found, abort.
-	return q.deliverTransferCancelEvent(handlers, p, evts)
+	return evts
+}
+
+func (q *pointerQueue) transferTarget(handlers map[event.Tag]*handler, types []string, targets []event.Tag) (event.Tag, string) {
+	for _, k := range targets {
+		h, ok := handlers[k]
+		if !ok {
+			continue
+		}
+		if mime, ok := firstMimeMatch(types, &h.filter.pointer); ok {
+			return k, mime
+		}
+	}
+	return nil, ""
 }
 
 func (q *pointerQueue) deliverTransferCancelEvent(handlers map[event.Tag]*handler, p pointerInfo, evts []taggedEvent) (pointerInfo, []taggedEvent) {
 	evts = append(evts, taggedEvent{tag: p.dataSource, event: transfer.CancelEvent{}})
 	// Cancel all potential targets.
-	src := &handlers[p.dataSource].filter.pointer
 	for k, h := range handlers {
-		if _, ok := firstMimeMatch(src, &h.filter.pointer); ok {
+		if _, ok := firstMimeMatch(p.types, &h.filter.pointer); ok {
 			evts = append(evts, taggedEvent{tag: k, event: transfer.CancelEvent{}})
 		}
 	}
 	p.dataSource = nil
 	p.dataTarget = nil
+	p.types = nil
 	return p, evts
 }
 
@@ -986,9 +1012,9 @@ func addHandler(tags []event.Tag, tag event.Tag) []event.Tag {
 }
 
 // firstMimeMatch returns the first type match between src and tgt.
-func firstMimeMatch(src, tgt *pointerFilter) (first string, matched bool) {
+func firstMimeMatch(src []string, tgt *pointerFilter) (first string, matched bool) {
 	for _, m1 := range tgt.targetMimes {
-		if slices.Contains(src.sourceMimes, m1) {
+		if slices.Contains(src, m1) {
 			return m1, true
 		}
 	}

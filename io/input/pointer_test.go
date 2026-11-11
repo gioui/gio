@@ -1124,6 +1124,23 @@ func TestTransfer(t *testing.T) {
 			t.Error("offer was not closed")
 		}
 	})
+
+	t.Run("source types change during drag", func(t *testing.T) {
+		var r Router
+		var ops op.Ops
+		src, tgt := setup(&r, &ops, "text/plain", "text/plain")
+		r.Frame(&ops)
+		r.Queue(
+			pointer.Event{Kind: pointer.Press, Position: f32.Pt(10, 10)},
+			pointer.Event{Kind: pointer.Move, Position: f32.Pt(10, 10)},
+		)
+		assertEventSequence(t, events(&r, -1, transfer.TargetFilter{Target: tgt, Type: "text/plain"}), transfer.InitiateEvent{})
+		events(&r, -1, transfer.SourceFilter{Target: src, Type: "image/png"})
+		events(&r, -1, transfer.TargetFilter{Target: tgt, Type: "image/png"})
+		r.Frame(&ops)
+		r.Queue(pointer.Event{Kind: pointer.Release, Position: f32.Pt(40, 10)})
+		assertEventSequence(t, events(&r, -1, transfer.SourceFilter{Target: src, Type: "image/png"}), transfer.RequestEvent{Type: "image/png"})
+	})
 }
 
 func TestDeferredInputOp(t *testing.T) {
