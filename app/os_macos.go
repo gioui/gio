@@ -71,6 +71,11 @@ static CFTypeRef readClipboard(void) {
 	}
 }
 
+static CFTypeRef fileDropPath(CFTypeRef paths, NSUInteger index) {
+	NSArray<NSString *> *array = (__bridge NSArray *)paths;
+	return (__bridge CFTypeRef)array[index];
+}
+
 static CGFloat viewHeight(CFTypeRef viewRef) {
 	@autoreleasepool {
 		NSView *view = (__bridge NSView *)viewRef;
@@ -742,6 +747,21 @@ func gio_onMouse(h C.uintptr_t, evt C.CFTypeRef, cdir C.int, cbtn C.NSInteger, x
 		Scroll:    f32.Point{X: dxf, Y: dyf},
 		Modifiers: convertMods(mods),
 	})
+}
+
+//export gio_onFileDrop
+func gio_onFileDrop(h C.uintptr_t, paths C.CFTypeRef, count C.NSUInteger, x, y C.CGFloat) {
+	w := windowFor(h)
+	files := make([]string, 0, int(count))
+	for i := range int(count) {
+		if path := nsstringToString(C.fileDropPath(paths, C.NSUInteger(i))); path != "" {
+			files = append(files, path)
+		}
+	}
+	if len(files) > 0 {
+		pos := f32.Point{X: float32(x) * w.scale, Y: float32(y) * w.scale}
+		w.ProcessEvent(fileDropEvent(pos, files))
+	}
 }
 
 //export gio_onDraw

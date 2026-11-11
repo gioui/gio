@@ -14,6 +14,14 @@
 // to the source and all potential targets.
 //
 // The RequestEvent is sent to the source upon drop.
+//
+// Files dropped from another application use the MIME type "text/uri-list".
+// [DataEvent.Open] returns file URIs separated by CRLF, not file contents.
+// The platform supplies the data.
+//
+// File drops are currently supported on Windows and macOS. These implementations
+// report the drop after the files are released. Targets receive [InitiateEvent]
+// and [CancelEvent] at that point; the selected target also receives [DataEvent].
 package transfer
 
 import (

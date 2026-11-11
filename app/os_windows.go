@@ -216,6 +216,7 @@ func (w *window) init() error {
 	if err := windows.RegisterTouchWindow(hwnd, 0); err != nil {
 		return err
 	}
+	windows.DragAcceptFiles(hwnd, true)
 	if err := windows.EnableMouseInPointer(1); err != nil {
 		return err
 	}
@@ -408,6 +409,17 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		}
 		szp.Rgrc[0] = mi.WorkArea
 		return 0
+	case windows.WM_DROPFILES:
+		hDrop := syscall.Handle(wParam)
+		defer windows.DragFinish(hDrop)
+		point, client := windows.DragQueryPoint(hDrop)
+		if !client {
+			return 0
+		}
+		if paths := dragQueryFiles(hDrop); len(paths) > 0 {
+			w.ProcessEvent(fileDropEvent(f32.Pt(float32(point.X), float32(point.Y)), paths))
+		}
+		return 0
 	case windows.WM_PAINT:
 		w.draw(true)
 	case windows.WM_STYLECHANGED:
@@ -538,6 +550,26 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 	}
 
 	return windows.DefWindowProc(hwnd, msg, wParam, lParam)
+}
+
+func dragQueryFiles(hDrop syscall.Handle) []string {
+	count := windows.DragQueryFile(hDrop, 0xffffffff, nil)
+	paths := make([]string, 0, count)
+	for i := range count {
+		size := windows.DragQueryFile(hDrop, i, nil)
+		if size == 0 {
+			continue
+		}
+		// The returned length excludes the NUL; the buffer needs room for it.
+		buf := make([]uint16, size+1)
+		if windows.DragQueryFile(hDrop, i, buf) == 0 {
+			continue
+		}
+		if path := syscall.UTF16ToString(buf); path != "" {
+			paths = append(paths, path)
+		}
+	}
+	return paths
 }
 
 // getModifiers reports the currently pressed modifier keys.
