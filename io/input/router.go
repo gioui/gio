@@ -119,6 +119,22 @@ type SystemEvent struct {
 	Event event.Event
 }
 
+// DropEvent reports data dropped onto a window from another application.
+// Router sends [transfer.InitiateEvent] and [transfer.CancelEvent] to matching
+// targets. The target at Position also receives a [transfer.DataEvent].
+type DropEvent struct {
+	// Position is the drop location in window coordinates, in pixels.
+	Position f32.Point
+	// Type is the MIME type of the offered data.
+	Type string
+	// Open returns a new reader on each call so Router can replay the event.
+	// The data must remain available until the event is processed.
+	// Router closes unused readers. The target closes readers it opens.
+	Open func() io.ReadCloser
+}
+
+func (DropEvent) ImplementsEvent() {}
+
 // handler contains the per-handler state tracked by a [Router].
 type handler struct {
 	// active tracks whether the handler was active in the current
@@ -484,6 +500,9 @@ func (q *Router) processEvent(e event.Event, system bool) {
 	case transfer.DataEvent:
 		cstate, evts := q.cqueue.Push(state.clipboardState, e)
 		state.clipboardState = cstate
+		q.changeState(e, state, evts)
+	case DropEvent:
+		evts := q.pointer.queue.drop(q.handlers, e)
 		q.changeState(e, state, evts)
 	default:
 		panic("unknown event type")

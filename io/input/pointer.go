@@ -400,10 +400,24 @@ func (c *pointerCollector) cursor(cursor pointer.Cursor) {
 	area.cursor = cursor
 }
 
+func (q *pointerQueue) drop(handlers map[event.Tag]*handler, e DropEvent) []taggedEvent {
+	p := pointerInfo{types: []string{e.Type}}
+	evts := q.initiateTransfer(handlers, p.types, nil)
+	q.hitTest(e.Position, func(n *hitNode) bool {
+		if _, ok := handlers[n.tag]; ok {
+			p.entered = addHandler(p.entered, n.tag)
+		}
+		return true
+	})
+	p.dataTarget, _ = q.transferTarget(handlers, p.types, p.entered)
+	_, evts = q.offerData(handlers, p, transfer.DataEvent{Type: e.Type, Open: e.Open}, evts)
+	return evts
+}
+
 func (q *pointerQueue) offer(handlers map[event.Tag]*handler, state pointerState, req transfer.OfferCmd) (pointerState, []taggedEvent) {
 	var evts []taggedEvent
 	for i, p := range state.pointers {
-		if p.dataSource != req.Tag {
+		if p.dataSource == nil || p.dataSource != req.Tag {
 			continue
 		}
 		if h, ok := handlers[p.dataSource]; ok {
@@ -969,7 +983,9 @@ func (q *pointerQueue) transferTarget(handlers map[event.Tag]*handler, types []s
 }
 
 func (q *pointerQueue) deliverTransferCancelEvent(handlers map[event.Tag]*handler, p pointerInfo, evts []taggedEvent) (pointerInfo, []taggedEvent) {
-	evts = append(evts, taggedEvent{tag: p.dataSource, event: transfer.CancelEvent{}})
+	if p.dataSource != nil {
+		evts = append(evts, taggedEvent{tag: p.dataSource, event: transfer.CancelEvent{}})
+	}
 	// Cancel all potential targets.
 	for k, h := range handlers {
 		if _, ok := firstMimeMatch(p.types, &h.filter.pointer); ok {

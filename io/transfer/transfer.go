@@ -2,19 +2,18 @@
 //
 // The transfer protocol is as follows:
 //
-//   - Data sources use [SourceFilter] to receive an [InitiateEvent] when a drag
-//     is initiated, and an [RequestEvent] for each initiation of a data transfer.
-//     Sources respond to requests with [OfferCmd].
-//   - Data targets use [TargetFilter] to receive an [DataEvent] for receiving data.
-//     The target must close the data event after use.
+//   - Data sources use [SourceFilter] to receive a [RequestEvent] when data is
+//     requested. Sources respond to requests with [OfferCmd].
+//   - Data targets use [TargetFilter] to receive data through a [DataEvent].
+//     The target must close the reader returned by [DataEvent.Open] after use.
 //
 // When a user initiates a pointer-guided drag and drop transfer, the
-// source as well as all potential targets receive an InitiateEvent.
+// potential targets receive an InitiateEvent.
 // Potential targets are targets with at least one MIME type in common
 // with the source. When a drag gesture completes, a CancelEvent is sent
 // to the source and all potential targets.
 //
-// Note that the RequestEvent is sent to the source upon drop.
+// The RequestEvent is sent to the source upon drop.
 package transfer
 
 import (
@@ -49,7 +48,8 @@ type SourceFilter struct {
 }
 
 // TargetFilter filters for any [DataEvent] whose type matches a MIME type
-// as well as [CancelEvent]. Use multiple filters to accept multiple types.
+// as well as [InitiateEvent] and [CancelEvent]. Use multiple filters to accept
+// multiple types.
 type TargetFilter struct {
 	// Target is a tag included in a previous event.Op.
 	Target event.Tag
@@ -66,10 +66,8 @@ type RequestEvent struct {
 
 func (RequestEvent) ImplementsEvent() {}
 
-// InitiateEvent is sent to a data source when a drag-and-drop
+// InitiateEvent is sent to potential data targets when a drag-and-drop
 // transfer gesture is initiated.
-//
-// Potential data targets also receive the event.
 type InitiateEvent struct{}
 
 func (InitiateEvent) ImplementsEvent() {}
