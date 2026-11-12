@@ -325,7 +325,10 @@ func (b *Backend) NewTexture(format driver.TextureFormat, width, height int, min
 	}
 	if bindings&driver.BufferBindingFramebuffer != 0 {
 		resource := (*d3d11.Resource)(unsafe.Pointer(tex))
-		fbo, err = b.dev.CreateRenderTargetView(resource)
+		fbo, err = b.dev.CreateRenderTargetView(resource, d3d11.RENDER_TARGET_VIEW_DESC{
+			Format:        d3dfmt,
+			ViewDimension: d3d11.RTV_DIMENSION_TEXTURE2D,
+		})
 		if err != nil {
 			if uaView != nil {
 				d3d11.IUnknownRelease(unsafe.Pointer(uaView), uaView.Vtbl.Release)
