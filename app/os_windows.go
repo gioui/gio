@@ -3,17 +3,19 @@
 package app
 
 import (
+	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
-	"gioui.org/io/transfer"
-	syscall "golang.org/x/sys/windows"
-	"golang.org/x/sys/windows/registry"
 	"image"
+	"image/color"
+	"image/png"
 	"io"
 	"math"
 	"os"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -25,13 +27,16 @@ import (
 	"gioui.org/app/internal/windows"
 	"gioui.org/op"
 	"gioui.org/unit"
-	gowindows "golang.org/x/sys/windows"
+	syscall "golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/registry"
 
 	"gioui.org/f32"
 	"gioui.org/io/event"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
+	"gioui.org/io/transfer"
+	"golang.org/x/image/bmp"
 )
 
 type Win32ViewEvent struct {
@@ -850,42 +855,370 @@ func (w *window) NewContext() (context, error) {
 	return nil, errors.New("NewContext: no available GPU drivers")
 }
 
-func (w *window) ReadClipboard() {
-	w.readClipboard()
+func (w *window) ReadClipboard(mime string) {
+	data, err := w.readClipboard(mime)
+	if err != nil {
+		data = nil
+	}
+	w.ProcessEvent(transfer.DataEvent{
+		Type: mime,
+		Open: func() io.ReadCloser {
+			return io.NopCloser(bytes.NewReader(data))
+		},
+	})
 }
 
-func (w *window) readClipboard() (cerr error) {
+func (w *window) readClipboard(mime string) ([]byte, error) {
+	if err := windows.OpenClipboard(w.hwnd); err != nil {
+		return nil, err
+	}
+	defer windows.CloseClipboard()
+	format, err := clipboardFormat(mime)
+	if err != nil {
+		return nil, err
+	}
+	if !windows.IsClipboardFormatAvailable(format) && mime != "image/png" {
+		return nil, nil
+	}
+	data, err := getClipboardData(format)
+	if mime == "image/png" && err != nil {
+		for _, format := range []uint32{windows.CF_DIBV5, windows.CF_DIB} {
+			dib, err := getClipboardData(format)
+			if err != nil {
+				continue
+			}
+			img, err := decodeClipboardDIB(dib)
+			if err != nil {
+				continue
+			}
+			var buf bytes.Buffer
+			if err := png.Encode(&buf, img); err != nil {
+				return nil, err
+			}
+			return buf.Bytes(), nil
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	switch mime {
+	case "application/text", "text/plain":
+		u16 := make([]uint16, 0, len(data)/2)
+		for len(data) >= 2 {
+			c := binary.LittleEndian.Uint16(data)
+			if c == 0 {
+				break
+			}
+			u16 = append(u16, c)
+			data = data[2:]
+		}
+		return []byte(string(utf16.Decode(u16))), nil
+	case "text/html":
+		return decodeClipboardHTML(bytes.TrimRight(data, "\x00"))
+	case "application/rtf", "text/rtf":
+		if end := bytes.IndexByte(data, 0); end >= 0 {
+			data = data[:end]
+		}
+	}
+	return data, nil
+}
+
+func clipboardFormat(mime string) (uint32, error) {
+	var name string
+	switch mime {
+	case "application/text", "text/plain":
+		return windows.CF_UNICODETEXT, nil
+	case "image/png":
+		name = "PNG"
+	case "text/html":
+		name = "HTML Format"
+	case "application/rtf", "text/rtf":
+		name = "Rich Text Format"
+	default:
+		return 0, fmt.Errorf("clipboard: unsupported type %q", mime)
+	}
+	return windows.RegisterClipboardFormat(name)
+}
+
+// getClipboardData copies data while the clipboard is open.
+func getClipboardData(format uint32) ([]byte, error) {
+	mem, err := windows.GetClipboardData(format)
+	if err != nil {
+		return nil, err
+	}
+	size, err := windows.GlobalSize(mem)
+	if err != nil {
+		return nil, err
+	}
+	ptr, err := windows.GlobalLock(mem)
+	if err != nil {
+		return nil, err
+	}
+	defer windows.GlobalUnlock(mem)
+	return bytes.Clone(unsafe.Slice((*byte)(ptr), size)), nil
+}
+
+func (w *window) WriteClipboard(c clipboardContent) {
+	w.writeClipboard(c)
+}
+
+func (w *window) writeClipboard(c clipboardContent) error {
+	contents := c.contents
+	entries := make([]clipboardContentPart, 0, len(contents))
+	for _, content := range contents {
+		format, err := clipboardFormat(content.Type)
+		if err != nil {
+			return err
+		}
+		data := content.Data
+		var dib []byte
+		switch content.Type {
+		case "application/text", "text/plain":
+			u16, err := syscall.UTF16FromString(string(data))
+			if err != nil {
+				return err
+			}
+			data = make([]byte, len(u16)*2)
+			for i, c := range u16 {
+				binary.LittleEndian.PutUint16(data[i*2:], c)
+			}
+		case "image/png":
+			img, err := png.Decode(bytes.NewReader(data))
+			if err != nil {
+				return err
+			}
+			dib = encodeClipboardDIB(img)
+		case "text/html":
+			data = encodeClipboardHTML(data)
+		case "application/rtf", "text/rtf":
+			data = append(bytes.Clone(data), 0)
+		}
+		entries = append(entries, clipboardContentPart{format: format, data: data})
+		if dib != nil {
+			entries = append(entries, clipboardContentPart{format: windows.CF_DIBV5, data: dib})
+		}
+	}
 	defer func() {
-		if cerr != nil {
-			w.processDataEvent("")
+		for _, part := range entries {
+			if part.mem != 0 {
+				windows.GlobalFree(part.mem)
+			}
 		}
 	}()
-
+	for i := range entries {
+		mem, err := globalClipboardData(entries[i].data)
+		if err != nil {
+			return err
+		}
+		entries[i].mem = mem
+	}
 	if err := windows.OpenClipboard(w.hwnd); err != nil {
 		return err
 	}
 	defer windows.CloseClipboard()
-	mem, err := windows.GetClipboardData(windows.CF_UNICODETEXT)
-	if err != nil {
+	if err := windows.EmptyClipboard(); err != nil {
 		return err
 	}
-	ptr, err := windows.GlobalLock(mem)
-	if err != nil {
-		return err
+	if c.sensitive {
+		// Keep sensitive content out of clipboard history and cloud sync.
+		for _, name := range []string{
+			"ExcludeClipboardContentFromMonitorProcessing",
+			"CanIncludeInClipboardHistory",
+			"CanUploadToCloudClipboard",
+		} {
+			format, err := windows.RegisterClipboardFormat(name)
+			if err == nil {
+				if err := setClipboardData(format, make([]byte, 4)); err != nil {
+					return err
+				}
+			}
+		}
 	}
-	defer windows.GlobalUnlock(mem)
-	content := gowindows.UTF16PtrToString((*uint16)(unsafe.Pointer(ptr)))
-	w.processDataEvent(content)
+	for i := range entries {
+		part := &entries[i]
+		if err := windows.SetClipboardData(part.format, part.mem); err != nil {
+			return err
+		}
+		part.mem = 0
+	}
 	return nil
 }
 
-func (w *window) processDataEvent(content string) {
-	w.ProcessEvent(transfer.DataEvent{
-		Type: "application/text",
-		Open: func() io.ReadCloser {
-			return io.NopCloser(strings.NewReader(content))
-		},
-	})
+type clipboardContentPart struct {
+	format uint32
+	mem    syscall.Handle
+	data   []byte
+}
+
+func globalClipboardData(data []byte) (syscall.Handle, error) {
+	mem, err := windows.GlobalAlloc(max(1, len(data)))
+	if err != nil {
+		return 0, err
+	}
+	ptr, err := windows.GlobalLock(mem)
+	if err != nil {
+		windows.GlobalFree(mem)
+		return 0, err
+	}
+	copy(unsafe.Slice((*byte)(ptr), len(data)), data)
+	windows.GlobalUnlock(mem)
+	return syscall.Handle(mem), nil
+}
+
+// setClipboardData copies data to the open clipboard in format.
+func setClipboardData(format uint32, data []byte) error {
+	mem, err := globalClipboardData(data)
+	if err != nil {
+		return err
+	}
+	if err := windows.SetClipboardData(format, mem); err != nil {
+		windows.GlobalFree(mem)
+		return err
+	}
+	return nil
+}
+
+func encodeClipboardDIB(img image.Image) []byte {
+	b := img.Bounds()
+	w, h := b.Dx(), b.Dy()
+	data := make([]byte, 124+w*h*4)
+	binary.LittleEndian.PutUint32(data, 124)
+	binary.LittleEndian.PutUint32(data[4:], uint32(w))
+	binary.LittleEndian.PutUint32(data[8:], uint32(h))
+	binary.LittleEndian.PutUint16(data[12:], 1)
+	binary.LittleEndian.PutUint16(data[14:], 32)
+	binary.LittleEndian.PutUint32(data[16:], 3) // BI_BITFIELDS
+	binary.LittleEndian.PutUint32(data[20:], uint32(w*h*4))
+	binary.LittleEndian.PutUint32(data[40:], 0xff0000)
+	binary.LittleEndian.PutUint32(data[44:], 0xff00)
+	binary.LittleEndian.PutUint32(data[48:], 0xff)
+	binary.LittleEndian.PutUint32(data[52:], 0xff000000)
+	binary.LittleEndian.PutUint32(data[56:], 0x73524742) // LCS_sRGB
+	binary.LittleEndian.PutUint32(data[108:], 4)         // LCS_GM_IMAGES
+	for y := range h {
+		row := data[124+(h-1-y)*w*4:]
+		for x := range w {
+			c := color.NRGBAModel.Convert(img.At(b.Min.X+x, b.Min.Y+y)).(color.NRGBA)
+			copy(row[x*4:], []byte{c.B, c.G, c.R, c.A})
+		}
+	}
+	return data
+}
+
+func decodeClipboardDIB(data []byte) (image.Image, error) {
+	invalid := errors.New("clipboard: unsupported or invalid DIB")
+	if len(data) < 40 {
+		return nil, invalid
+	}
+	header := uint64(binary.LittleEndian.Uint32(data))
+	if header != 40 && header != 108 && header != 124 {
+		return nil, invalid
+	}
+	if header > uint64(len(data)) {
+		return nil, invalid
+	}
+	if header == 40 && binary.LittleEndian.Uint32(data[16:]) == 3 {
+		// BITMAPINFOHEADER stores its color masks after the header.
+		if len(data) < 52 || binary.LittleEndian.Uint16(data[14:]) != 32 {
+			return nil, invalid
+		}
+		if binary.LittleEndian.Uint32(data[40:]) != 0xff0000 ||
+			binary.LittleEndian.Uint32(data[44:]) != 0xff00 ||
+			binary.LittleEndian.Uint32(data[48:]) != 0xff {
+			return nil, invalid
+		}
+		plain := append(bytes.Clone(data[:40]), data[52:]...)
+		binary.LittleEndian.PutUint32(plain[16:], 0)
+		return decodeClipboardDIB(plain)
+	}
+	w := int64(int32(binary.LittleEndian.Uint32(data[4:])))
+	h := int64(int32(binary.LittleEndian.Uint32(data[8:])))
+	if h < 0 {
+		h = -h
+	}
+	bpp := uint64(binary.LittleEndian.Uint16(data[14:]))
+	if w <= 0 || h <= 0 || (bpp != 8 && bpp != 24 && bpp != 32) {
+		return nil, invalid
+	}
+	offset := header
+	if bpp == 8 {
+		colors := uint64(binary.LittleEndian.Uint32(data[32:]))
+		if colors == 0 {
+			colors = 256
+		}
+		if colors > 256 {
+			return nil, invalid
+		}
+		offset += colors * 4
+	}
+	maxUint := ^uint64(0)
+	if uint64(w) > (maxUint-31)/bpp {
+		return nil, invalid
+	}
+	stride := (uint64(w)*bpp + 31) / 32 * 4
+	if stride > maxUint/uint64(h) {
+		return nil, invalid
+	}
+	pixels := stride * uint64(h)
+	if uint64(w)*uint64(h) > uint64(^uint(0)>>1)/4 {
+		return nil, invalid
+	}
+	if offset > uint64(len(data)) || pixels > uint64(len(data))-offset || offset > uint64(^uint32(0)-14) {
+		return nil, invalid
+	}
+	// A clipboard DIB has no BMP file header.
+	var fileHeader [14]byte
+	copy(fileHeader[:], "BM")
+	binary.LittleEndian.PutUint32(fileHeader[10:], uint32(14+offset))
+	return bmp.Decode(io.MultiReader(bytes.NewReader(fileHeader[:]), bytes.NewReader(data)))
+}
+
+func encodeClipboardHTML(fragment []byte) []byte {
+	const header = "Version:1.0\r\nStartHTML:%010d\r\nEndHTML:%010d\r\nStartFragment:%010d\r\nEndFragment:%010d\r\n"
+	const prefix = "<html><body><!--StartFragment-->"
+	const suffix = "<!--EndFragment--></body></html>"
+	startHTML := len(fmt.Appendf(nil, header, 0, 0, 0, 0))
+	start := startHTML + len(prefix)
+	end := start + len(fragment)
+	data := fmt.Appendf(nil, header, startHTML, end+len(suffix), start, end)
+	data = append(data, prefix...)
+	data = append(data, fragment...)
+	data = append(data, suffix...)
+	return append(data, 0)
+}
+
+func decodeClipboardHTML(data []byte) ([]byte, error) {
+	offsets := make(map[string]int)
+	rest := data
+	for len(rest) > 0 && rest[0] != '<' {
+		line := rest
+		if i := bytes.IndexByte(rest, '\n'); i >= 0 {
+			line = rest[:i]
+			rest = rest[i+1:]
+		} else {
+			rest = nil
+		}
+		line = bytes.TrimSuffix(line, []byte("\r"))
+		key, value, ok := bytes.Cut(line, []byte(":"))
+		if !ok {
+			continue
+		}
+		n, err := strconv.Atoi(string(bytes.TrimSpace(value)))
+		if err == nil {
+			offsets[string(key)] = n
+		}
+	}
+	for _, names := range [][2]string{
+		{"StartFragment", "EndFragment"},
+		{"StartHTML", "EndHTML"},
+	} {
+		start, okStart := offsets[names[0]]
+		end, okEnd := offsets[names[1]]
+		if okStart && okEnd && start >= 0 && start <= end && end <= len(data) {
+			return data[start:end], nil
+		}
+	}
+	return nil, errors.New("clipboard: invalid HTML payload")
 }
 
 func (w *window) Configure(options []Option) {
@@ -987,66 +1320,6 @@ func (w *window) Configure(options []Option) {
 	if oldStyle&windows.WS_VISIBLE == 0 || shown != showMode {
 		windows.ShowWindow(w.hwnd, showMode)
 	}
-}
-
-func (w *window) WriteClipboard(c clipboardContent) {
-	w.writeClipboard(string(c.data), c.sensitive)
-}
-
-func (w *window) writeClipboard(s string, sensitive bool) error {
-	if err := windows.OpenClipboard(w.hwnd); err != nil {
-		return err
-	}
-	defer windows.CloseClipboard()
-	if err := windows.EmptyClipboard(); err != nil {
-		return err
-	}
-	u16, err := gowindows.UTF16FromString(s)
-	if err != nil {
-		return err
-	}
-	if sensitive {
-		// These registered formats with the DWORD 0 keep the content out of
-		// clipboard monitors, the clipboard history (Win+V) and the cloud
-		// clipboard. They are set before the content itself. A format that
-		// cannot be set leaves the content unmarked for that purpose only.
-		formats := [...]string{
-			"ExcludeClipboardContentFromMonitorProcessing",
-			"CanIncludeInClipboardHistory",
-			"CanUploadToCloudClipboard",
-		}
-		for _, name := range formats {
-			format, err := windows.RegisterClipboardFormat(name)
-			if err != nil {
-				continue
-			}
-			var v uint32
-			setClipboardData(format, unsafe.Slice((*byte)(unsafe.Pointer(&v)), unsafe.Sizeof(v)))
-		}
-	}
-	n := len(u16) * int(unsafe.Sizeof(u16[0]))
-	text := unsafe.Slice((*byte)(unsafe.Pointer(unsafe.SliceData(u16))), n)
-	return setClipboardData(windows.CF_UNICODETEXT, text)
-}
-
-// setClipboardData puts a copy of data on the open clipboard in format.
-func setClipboardData(format uint32, data []byte) error {
-	mem, err := windows.GlobalAlloc(len(data))
-	if err != nil {
-		return err
-	}
-	ptr, err := windows.GlobalLock(mem)
-	if err != nil {
-		windows.GlobalFree(mem)
-		return err
-	}
-	copy(unsafe.Slice((*byte)(ptr), len(data)), data)
-	windows.GlobalUnlock(mem)
-	if err := windows.SetClipboardData(format, mem); err != nil {
-		windows.GlobalFree(mem)
-		return err
-	}
-	return nil
 }
 
 func (w *window) SetCursor(cursor pointer.Cursor) {

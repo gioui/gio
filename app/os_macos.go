@@ -5,6 +5,7 @@
 package app
 
 import (
+	"bytes"
 	"errors"
 	"image"
 	"io"
@@ -14,6 +15,7 @@ import (
 	"time"
 	"unicode"
 	"unicode/utf8"
+	"unsafe"
 
 	"gioui.org/internal/f32"
 	"gioui.org/io/event"
@@ -32,6 +34,7 @@ import (
 #cgo LDFLAGS: -framework AppKit -framework QuartzCore
 
 #include <AppKit/AppKit.h>
+#include <string.h>
 
 #define MOUSE_MOVE 1
 #define MOUSE_UP 2
@@ -44,31 +47,53 @@ __attribute__ ((visibility ("hidden"))) CFTypeRef gio_createView(int presentWith
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_createWindow(CFTypeRef viewRef, CGFloat width, CGFloat height);
 __attribute__ ((visibility ("hidden"))) void gio_viewSetHandle(CFTypeRef viewRef, uintptr_t handle);
 
-static void writeClipboard(CFTypeRef str, int sensitive) {
+static void writeClipboardContents(const void *text, NSUInteger textLen, bool hasText,
+	const void *html, NSUInteger htmlLen, bool hasHTML,
+	const void *png, NSUInteger pngLen, bool hasPNG, int sensitive) {
 	@autoreleasepool {
-		NSString *s = (__bridge NSString *)str;
 		NSPasteboard *p = NSPasteboard.generalPasteboard;
-		// The marker types of the nspasteboard.org convention, with empty
-		// data, tell clipboard managers to keep no history of sensitive
-		// content. They are set before the content itself.
-		NSArray<NSPasteboardType> *markers = @[];
+		NSMutableArray<NSPasteboardType> *types = [NSMutableArray array];
 		if (sensitive) {
-			markers = @[@"org.nspasteboard.ConcealedType", @"org.nspasteboard.TransientType"];
+			[types addObject:@"org.nspasteboard.ConcealedType"];
+			[types addObject:@"org.nspasteboard.TransientType"];
 		}
-		[p declareTypes:[markers arrayByAddingObject:NSPasteboardTypeString] owner:nil];
-		for (NSPasteboardType t in markers) {
-			[p setData:[NSData data] forType:t];
+		if (hasText) [types addObject:NSPasteboardTypeString];
+		if (hasHTML) [types addObject:NSPasteboardTypeHTML];
+		if (hasPNG) [types addObject:NSPasteboardTypePNG];
+		[p declareTypes:types owner:nil];
+		if (sensitive) {
+			[p setData:[NSData data] forType:@"org.nspasteboard.ConcealedType"];
+			[p setData:[NSData data] forType:@"org.nspasteboard.TransientType"];
 		}
-		[p setString:s forType:NSPasteboardTypeString];
+		if (hasText) {
+			NSString *s = [[NSString alloc] initWithBytes:text length:textLen encoding:NSUTF8StringEncoding];
+			if (s != nil) [p setString:s forType:NSPasteboardTypeString];
+		}
+		if (hasHTML) [p setData:[NSData dataWithBytes:html length:htmlLen] forType:NSPasteboardTypeHTML];
+		if (hasPNG) [p setData:[NSData dataWithBytes:png length:pngLen] forType:NSPasteboardTypePNG];
 	}
 }
 
-static CFTypeRef readClipboard(void) {
+static CFTypeRef readClipboardData(int kind) {
 	@autoreleasepool {
 		NSPasteboard *p = NSPasteboard.generalPasteboard;
-		NSString *content = [p stringForType:NSPasteboardTypeString];
+		if (kind == 0) {
+			NSString *content = [p stringForType:NSPasteboardTypeString];
+			return (__bridge_retained CFTypeRef)content;
+		}
+		NSPasteboardType type = kind == 1 ? NSPasteboardTypeHTML : NSPasteboardTypePNG;
+		NSData *content = [p dataForType:type];
 		return (__bridge_retained CFTypeRef)content;
 	}
+}
+
+static NSUInteger clipboardDataLength(CFTypeRef dataRef) {
+	return [(__bridge NSData *)dataRef length];
+}
+
+static void clipboardDataCopy(CFTypeRef dataRef, void *dst) {
+	NSData *data = (__bridge NSData *)dataRef;
+	memcpy(dst, [data bytes], [data length]);
 }
 
 static CGFloat viewHeight(CFTypeRef viewRef) {
@@ -406,28 +431,71 @@ func (w *window) contextView() C.CFTypeRef {
 	return w.view
 }
 
-func (w *window) ReadClipboard() {
-	cstr := C.readClipboard()
-	if cstr != 0 {
-		defer C.CFRelease(cstr)
+func (w *window) ReadClipboard(mime string) {
+	kind := 0
+	switch mime {
+	case "application/text", "text/plain":
+	case "text/html":
+		kind = 1
+	case "image/png":
+		kind = 2
+	default:
+		if !readClipboardText(w, mime) {
+			return
+		}
 	}
-	content := nsstringToString(cstr)
-	w.ProcessEvent(transfer.DataEvent{
-		Type: "application/text",
-		Open: func() io.ReadCloser {
+	dataRef := C.readClipboardData(C.int(kind))
+	if dataRef == 0 {
+		w.ProcessEvent(transfer.DataEvent{Type: mime, Open: func() io.ReadCloser {
+			return io.NopCloser(strings.NewReader(""))
+		}})
+		return
+	}
+	defer C.CFRelease(dataRef)
+	if kind == 0 {
+		content := nsstringToString(dataRef)
+		w.ProcessEvent(transfer.DataEvent{Type: mime, Open: func() io.ReadCloser {
 			return io.NopCloser(strings.NewReader(content))
-		},
-	})
+		}})
+		return
+	}
+	n := int(C.clipboardDataLength(dataRef))
+	data := make([]byte, n)
+	if n > 0 {
+		C.clipboardDataCopy(dataRef, unsafe.Pointer(unsafe.SliceData(data)))
+	}
+	w.ProcessEvent(transfer.DataEvent{Type: mime, Open: func() io.ReadCloser {
+		return io.NopCloser(bytes.NewReader(data))
+	}})
 }
 
 func (w *window) WriteClipboard(c clipboardContent) {
-	cstr := stringToNSString(string(c.data))
-	defer C.CFRelease(cstr)
+	var text, html, png []byte
+	var hasText, hasHTML, hasPNG bool
+	contents := c.contents
+	for _, content := range contents {
+		switch content.Type {
+		case "application/text", "text/plain":
+			text = content.Data
+			hasText = true
+		case "text/html":
+			html = content.Data
+			hasHTML = true
+		case "image/png":
+			png = content.Data
+			hasPNG = true
+		}
+	}
+	if len(contents) > 0 && !hasText && !hasHTML && !hasPNG {
+		return
+	}
 	var sens C.int
 	if c.sensitive {
 		sens = 1
 	}
-	C.writeClipboard(cstr, sens)
+	C.writeClipboardContents(unsafe.Pointer(unsafe.SliceData(text)), C.NSUInteger(len(text)), C.bool(hasText),
+		unsafe.Pointer(unsafe.SliceData(html)), C.NSUInteger(len(html)), C.bool(hasHTML),
+		unsafe.Pointer(unsafe.SliceData(png)), C.NSUInteger(len(png)), C.bool(hasPNG), sens)
 }
 
 func (w *window) updateWindowMode() {

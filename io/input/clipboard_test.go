@@ -109,9 +109,6 @@ func assertClipboardReadDuplicated(t *testing.T, router *Router, expected int) {
 
 func assertClipboardWriteCmd(t *testing.T, router *Router, mimeExp, expected string) {
 	t.Helper()
-	if (router.cqueue.text != nil) != (expected != "") {
-		t.Error("text not defined")
-	}
 	mime, text, ok := router.cqueue.WriteClipboard()
 	if ok != (expected != "") {
 		t.Error("duplicated requests")
@@ -140,5 +137,86 @@ func TestClipboardWriteSensitive(t *testing.T) {
 	write("plain", false)
 	if r.ClipboardSensitive() {
 		t.Error("a plain write is marked as sensitive")
+	}
+}
+
+func TestClipboardReadTypes(t *testing.T) {
+	var r Router
+	var text, image int
+	r.Source().Execute(clipboard.ReadCmd{Tag: &text})
+	r.Source().Execute(clipboard.ReadCmd{Tag: &image, Type: "image/png"})
+	r.Source().Execute(clipboard.ReadCmd{Tag: &image, Type: "image/png"})
+	if types := r.ClipboardTypes(); len(types) != 2 || types[0] != "application/text" || types[1] != "image/png" {
+		t.Fatalf("unexpected requested types: %v", types)
+	}
+	open := func() io.ReadCloser { return io.NopCloser(strings.NewReader("")) }
+	r.Queue(transfer.DataEvent{Type: "image/png", Open: open})
+	assertEventTypeSequence(t, events(&r, -1, transfer.TargetFilter{Target: &image, Type: "image/png"}), transfer.DataEvent{})
+	assertEventTypeSequence(t, events(&r, -1, transfer.TargetFilter{Target: &text, Type: "application/text"}))
+	if types := r.ClipboardTypes(); len(types) != 1 || types[0] != "application/text" {
+		t.Fatalf("text request lost: %v", types)
+	}
+	r.Queue(transfer.DataEvent{Type: "application/text", Open: open})
+	assertEventTypeSequence(t, events(&r, -1, transfer.TargetFilter{Target: &text, Type: "application/text"}), transfer.DataEvent{})
+	if types := r.ClipboardTypes(); len(types) != 0 {
+		t.Fatalf("completed requests remain: %v", types)
+	}
+}
+
+func TestClipboardWriteContents(t *testing.T) {
+	var r Router
+	r.Source().Execute(clipboard.WriteContentsCmd{Contents: []clipboard.Content{
+		{Type: "application/text", Data: []byte("plain")},
+		{Type: "text/html", Data: []byte("<b>plain</b>")},
+	}})
+	r.Frame(new(op.Ops))
+	contents, ok := r.WriteClipboardContents()
+	if !ok || len(contents) != 2 {
+		t.Fatalf("got %v, %v", contents, ok)
+	}
+	if string(contents[0].Data) != "plain" || string(contents[1].Data) != "<b>plain</b>" {
+		t.Fatalf("unexpected contents: %q, %q", contents[0].Data, contents[1].Data)
+	}
+}
+
+func TestClipboardReadContents(t *testing.T) {
+	var r Router
+	var target int
+	r.Source().Execute(clipboard.ReadContentsCmd{Tag: &target, Types: []string{"application/text", "text/html"}})
+	if types := r.ClipboardTypes(); len(types) != 2 {
+		t.Fatalf("unexpected types: %v", types)
+	}
+	r.Queue(transfer.DataEvent{Type: "application/text", Open: func() io.ReadCloser {
+		return io.NopCloser(strings.NewReader("plain"))
+	}})
+	assertEventTypeSequence(t, events(&r, -1, transfer.TargetFilter{Target: &target, Type: "application/text"}), transfer.DataEvent{})
+	r.Queue(transfer.DataEvent{Type: "text/html", Open: func() io.ReadCloser {
+		return io.NopCloser(strings.NewReader("<b>plain</b>"))
+	}})
+	assertEventTypeSequence(t, events(&r, -1, transfer.TargetFilter{Target: &target, Type: "text/html"}), transfer.DataEvent{})
+	if types := r.ClipboardTypes(); len(types) != 0 {
+		t.Fatalf("completed requests remain: %v", types)
+	}
+}
+
+func TestClipboardContentsCopyAndClear(t *testing.T) {
+	var r Router
+	data := []byte("plain")
+	r.Source().Execute(clipboard.WriteContentsCmd{
+		Contents:  []clipboard.Content{{Type: "application/text", Data: data}},
+		Sensitive: true,
+	})
+	data[0] = 'X'
+	contents, ok := r.WriteClipboardContents()
+	if !ok || string(contents[0].Data) != "plain" || !r.ClipboardSensitive() {
+		t.Fatalf("write did not retain its data and sensitivity: %v", contents)
+	}
+	r.Source().Execute(clipboard.WriteContentsCmd{})
+	contents, ok = r.WriteClipboardContents()
+	if !ok || len(contents) != 0 || r.ClipboardSensitive() {
+		t.Fatal("empty write did not clear the clipboard")
+	}
+	if _, ok := r.WriteClipboardContents(); ok {
+		t.Fatal("clipboard clear repeated")
 	}
 }

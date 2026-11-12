@@ -1404,8 +1404,12 @@ func newWindow(window *callbacks, options []Option) {
 }
 
 func (w *window) WriteClipboard(c clipboardContent) {
+	data, ok := c.text()
+	if !ok {
+		return
+	}
 	runInJVM(javaVM(), func(env *C.JNIEnv) {
-		jstr := javaString(env, string(c.data))
+		jstr := javaString(env, string(data))
 		jsensitive := jvalue(C.JNI_FALSE)
 		if c.sensitive {
 			jsensitive = jvalue(C.JNI_TRUE)
@@ -1415,7 +1419,10 @@ func (w *window) WriteClipboard(c clipboardContent) {
 	})
 }
 
-func (w *window) ReadClipboard() {
+func (w *window) ReadClipboard(mime string) {
+	if !readClipboardText(w, mime) {
+		return
+	}
 	runInJVM(javaVM(), func(env *C.JNIEnv) {
 		c, err := callStaticObjectMethod(env, android.gioCls, android.mreadClipboard,
 			jvalue(android.appCtx))
@@ -1424,7 +1431,7 @@ func (w *window) ReadClipboard() {
 		}
 		content := goString(env, C.jstring(c))
 		w.processEvent(transfer.DataEvent{
-			Type: "application/text",
+			Type: mime,
 			Open: func() io.ReadCloser {
 				return io.NopCloser(strings.NewReader(content))
 			},

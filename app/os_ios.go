@@ -294,12 +294,18 @@ func onTouch(h C.uintptr_t, last C.int, touchRef C.CFTypeRef, phase C.NSInteger,
 	})
 }
 
-func (w *window) ReadClipboard() {
+func (w *window) ReadClipboard(mime string) {
+	if !readClipboardText(w, mime) {
+		return
+	}
 	cstr := C.readClipboard()
-	defer C.CFRelease(cstr)
-	content := nsstringToString(cstr)
+	var content string
+	if cstr != 0 {
+		defer C.CFRelease(cstr)
+		content = nsstringToString(cstr)
+	}
 	w.ProcessEvent(transfer.DataEvent{
-		Type: "application/text",
+		Type: mime,
 		Open: func() io.ReadCloser {
 			return io.NopCloser(strings.NewReader(content))
 		},
@@ -307,7 +313,11 @@ func (w *window) ReadClipboard() {
 }
 
 func (w *window) WriteClipboard(c clipboardContent) {
-	u16 := utf16.Encode([]rune(string(c.data)))
+	data, ok := c.text()
+	if !ok {
+		return
+	}
+	u16 := utf16.Encode([]rune(string(data)))
 	chars := (*C.unichar)(unsafe.Pointer(unsafe.SliceData(u16)))
 	var sens C.int
 	if c.sensitive {

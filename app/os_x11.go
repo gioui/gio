@@ -39,6 +39,7 @@ import (
 	"unsafe"
 
 	"gioui.org/f32"
+	"gioui.org/io/clipboard"
 	"gioui.org/io/event"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
@@ -109,11 +110,12 @@ type x11Window struct {
 
 	pointerBtns pointer.Buttons
 
-	clipboard clipboardContent
-	cursor    pointer.Cursor
-	config    Config
-	closing   *ClosingEvent
-	delivered *ClosingEvent
+	clipboardReads []string
+	clipboard      clipboardContent
+	cursor         pointer.Cursor
+	config         Config
+	closing        *ClosingEvent
+	delivered      *ClosingEvent
 
 	wakeups     chan struct{}
 	dispatchFns chan func()
@@ -156,12 +158,24 @@ func (w *x11Window) SetAnimating(anim bool) {
 	w.animating = anim
 }
 
-func (w *x11Window) ReadClipboard() {
+func (w *x11Window) ReadClipboard(mime string) {
+	if !readClipboardText(w, mime) {
+		return
+	}
+	w.clipboardReads = append(w.clipboardReads, mime)
+	if len(w.clipboardReads) > 1 {
+		return
+	}
 	C.XDeleteProperty(w.x, w.xw, w.atoms.clipboardContent)
 	C.XConvertSelection(w.x, w.atoms.clipboard, w.atoms.utf8string, w.atoms.clipboardContent, w.xw, C.CurrentTime)
 }
 
 func (w *x11Window) WriteClipboard(c clipboardContent) {
+	data, ok := c.text()
+	if !ok {
+		return
+	}
+	c.contents = []clipboard.Content{{Type: "application/text", Data: data}}
 	w.clipboard = c
 	C.XSetSelectionOwner(w.x, w.atoms.clipboard, w.xw, C.CurrentTime)
 	C.XSetSelectionOwner(w.x, w.atoms.primary, w.xw, C.CurrentTime)
@@ -754,28 +768,29 @@ func (h *x11EventHandler) handleEvents() bool {
 		case C.SelectionNotify:
 			cevt := (*C.XSelectionEvent)(unsafe.Pointer(xev))
 			prop := w.atoms.clipboardContent
-			if cevt.property != prop {
+			if cevt.selection != w.atoms.clipboard || (cevt.property != prop && cevt.property != C.None) {
 				break
 			}
-			if cevt.selection != w.atoms.clipboard {
-				break
+			var str string
+			if cevt.property != C.None {
+				var text C.XTextProperty
+				if C.XGetTextProperty(w.x, w.xw, &text, prop) != 0 {
+					if text.format == 8 && text.encoding == w.atoms.utf8string {
+						str = C.GoStringN((*C.char)(unsafe.Pointer(text.value)), C.int(text.nitems))
+					}
+					C.XFree(unsafe.Pointer(text.value))
+				}
 			}
-			var text C.XTextProperty
-			if st := C.XGetTextProperty(w.x, w.xw, &text, prop); st == 0 {
-				// Failed; ignore.
-				break
+			reads := w.clipboardReads
+			w.clipboardReads = nil
+			for _, mime := range reads {
+				w.ProcessEvent(transfer.DataEvent{
+					Type: mime,
+					Open: func() io.ReadCloser {
+						return io.NopCloser(strings.NewReader(str))
+					},
+				})
 			}
-			if text.format != 8 || text.encoding != w.atoms.utf8string {
-				// Ignore non-utf-8 encoded strings.
-				break
-			}
-			str := C.GoStringN((*C.char)(unsafe.Pointer(text.value)), C.int(text.nitems))
-			w.ProcessEvent(transfer.DataEvent{
-				Type: "application/text",
-				Open: func() io.ReadCloser {
-					return io.NopCloser(strings.NewReader(str))
-				},
-			})
 		case C.SelectionRequest:
 			cevt := (*C.XSelectionRequestEvent)(unsafe.Pointer(xev))
 			// reply tells the requestor that the data is in property, or,
@@ -824,7 +839,7 @@ func (h *x11EventHandler) handleEvents() bool {
 				// ...then notify the requestor.
 				notify()
 			case w.atoms.plaintext, w.atoms.utf8string, w.atoms.gtk_text_buffer_contents:
-				content := w.clipboard.data
+				content, _ := w.clipboard.text()
 				ptr := (*C.uchar)(unsafe.Pointer(unsafe.SliceData(content)))
 				C.XChangeProperty(w.x, cevt.requestor, cevt.property, cevt.target,
 					8 /* bitwidth */, C.PropModeReplace,
