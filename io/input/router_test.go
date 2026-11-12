@@ -41,6 +41,40 @@ func TestRouterWakeup(t *testing.T) {
 	}
 }
 
+func TestRouterAcceptsTransfer(t *testing.T) {
+	var r Router
+	var ops op.Ops
+	var tag int
+	for _, test := range []struct {
+		name   string
+		filter event.Filter
+		area   bool
+		want   bool
+	}{
+		{name: "empty"},
+		{name: "source", filter: transfer.SourceFilter{Target: &tag, Type: "text/uri-list"}, area: true},
+		{name: "target without area", filter: transfer.TargetFilter{Target: &tag, Type: "text/uri-list"}},
+		{name: "file target", filter: transfer.TargetFilter{Target: &tag, Type: "text/uri-list"}, area: true, want: true},
+		{name: "text target", filter: transfer.TargetFilter{Target: &tag, Type: "text/plain"}, area: true},
+		{name: "file target returns", filter: transfer.TargetFilter{Target: &tag, Type: "text/uri-list"}, area: true, want: true},
+		{name: "filter removed", area: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			ops.Reset()
+			if test.filter != nil {
+				r.Event(test.filter)
+			}
+			if test.area {
+				event.Op(&ops, &tag)
+			}
+			r.Frame(&ops)
+			if got := r.AcceptsTransfer("text/uri-list"); got != test.want {
+				t.Errorf("AcceptsTransfer = %v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
 func TestExternalDrop(t *testing.T) {
 	for _, test := range []struct {
 		name       string

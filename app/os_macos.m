@@ -441,7 +441,6 @@ CFTypeRef gio_createView(int presentWithTrans) {
 		NSRect frame = NSMakeRect(0, 0, 0, 0);
 		GioView* view = [[GioView alloc] initWithFrame:frame];
 		view.presentWithTrans = presentWithTrans ? YES : NO;
-		[view registerForDraggedTypes:@[NSPasteboardTypeFileURL, NSFilenamesPboardType]];
 		view.wantsLayer = YES;
 		view.layerContentsRedrawPolicy = NSViewLayerContentsRedrawDuringViewResize;
 

@@ -2026,6 +2026,8 @@ func (w *window) surface() (*C.struct_wl_surface, int, int) {
 	return w.surf, sz.X, sz.Y
 }
 
+func (w *window) SetFileDropEnabled(enabled bool) {}
+
 func (w *window) ShowTextInput(show bool) {
 	w.textInput = show
 	s := w.disp.seat

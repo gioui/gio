@@ -216,7 +216,6 @@ func (w *window) init() error {
 	if err := windows.RegisterTouchWindow(hwnd, 0); err != nil {
 		return err
 	}
-	windows.DragAcceptFiles(hwnd, true)
 	if err := windows.EnableMouseInPointer(1); err != nil {
 		return err
 	}
@@ -1131,6 +1130,10 @@ func loadCursor(cursor pointer.Cursor) (syscall.Handle, error) {
 	default:
 		return windows.LoadCursor(windowsCursor[cursor])
 	}
+}
+
+func (w *window) SetFileDropEnabled(enabled bool) {
+	windows.DragAcceptFiles(w.hwnd, enabled)
 }
 
 func (w *window) ShowTextInput(show bool) {

@@ -942,6 +942,8 @@ func (w *window) SetCursor(cursor pointer.Cursor) {
 	style.Set("cursor", webCursor[cursor])
 }
 
+func (w *window) SetFileDropEnabled(enabled bool) {}
+
 func (w *window) ShowTextInput(show bool) {
 	// Run in a goroutine to avoid a deadlock if the
 	// focus change result in an event.

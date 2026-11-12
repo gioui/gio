@@ -736,6 +736,16 @@ func (q *Router) ClickFocus() {
 	q.changeState(nil, state, q.pointer.queue.Deliver(q.handlers, area, e))
 }
 
+// AcceptsTransfer reports whether a target in the most recent frame accepts mime.
+func (q *Router) AcceptsTransfer(mime string) bool {
+	for _, h := range q.handlers {
+		if h.pointer.areaPlusOne != 0 && slices.Contains(h.filter.pointer.targetMimes, mime) {
+			return true
+		}
+	}
+	return false
+}
+
 // TextInputState returns the input state from the most recent
 // call to Frame.
 func (q *Router) TextInputState() TextInputState {

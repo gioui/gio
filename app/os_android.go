@@ -1244,6 +1244,8 @@ func (w *window) EditorStateChanged(old, new editorState) {
 	})
 }
 
+func (w *window) SetFileDropEnabled(enabled bool) {}
+
 func (w *window) ShowTextInput(show bool) {
 	runInJVM(javaVM(), func(env *C.JNIEnv) {
 		if show {

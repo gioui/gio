@@ -197,6 +197,8 @@ type driver interface {
 	Configure([]Option)
 	// SetCursor updates the current cursor to name.
 	SetCursor(cursor pointer.Cursor)
+	// SetFileDropEnabled enables or disables file drops for the window.
+	SetFileDropEnabled(enabled bool)
 	// Perform actions on the window.
 	Perform(system.Action)
 	// EditorStateChanged notifies the driver that the editor state changed.

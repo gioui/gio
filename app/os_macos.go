@@ -44,6 +44,17 @@ __attribute__ ((visibility ("hidden"))) CFTypeRef gio_createView(int presentWith
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_createWindow(CFTypeRef viewRef, CGFloat width, CGFloat height);
 __attribute__ ((visibility ("hidden"))) void gio_viewSetHandle(CFTypeRef viewRef, uintptr_t handle);
 
+static void setFileDrop(CFTypeRef viewRef, bool accept) {
+	@autoreleasepool {
+		NSView *view = (__bridge NSView *)viewRef;
+		if (accept) {
+			[view registerForDraggedTypes:@[NSPasteboardTypeFileURL, NSFilenamesPboardType]];
+		} else {
+			[view unregisterDraggedTypes];
+		}
+	}
+}
+
 static void writeClipboard(CFTypeRef str, int sensitive) {
 	@autoreleasepool {
 		NSString *s = (__bridge NSString *)str;
@@ -573,6 +584,10 @@ func (w *window) EditorStateChanged(old, new editorState) {
 	if old.Selection.Caret != new.Selection.Caret || old.Selection.Transform != new.Selection.Transform {
 		C.invalidateCharacterCoordinates(w.view)
 	}
+}
+
+func (w *window) SetFileDropEnabled(enabled bool) {
+	C.setFileDrop(w.view, C.bool(enabled))
 }
 
 func (w *window) ShowTextInput(show bool) {}

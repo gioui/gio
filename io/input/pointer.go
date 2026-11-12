@@ -417,7 +417,7 @@ func (q *pointerQueue) drop(handlers map[event.Tag]*handler, e DropEvent) []tagg
 func (q *pointerQueue) offer(handlers map[event.Tag]*handler, state pointerState, req transfer.OfferCmd) (pointerState, []taggedEvent) {
 	var evts []taggedEvent
 	for i, p := range state.pointers {
-		if p.dataSource == nil || p.dataSource != req.Tag {
+		if p.dataSource != req.Tag {
 			continue
 		}
 		if h, ok := handlers[p.dataSource]; ok {

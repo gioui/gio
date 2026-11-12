@@ -76,7 +76,8 @@ type Window struct {
 		*material.Theme
 		*widget.Decorations
 	}
-	nocontext bool
+	fileDropEnabled bool
+	nocontext       bool
 	// semantic data, lazily evaluated if requested by a backend to speed up
 	// the cases where semantic data is not needed.
 	semantic struct {
@@ -252,6 +253,10 @@ func (w *Window) updateState() {
 	}
 	w.semantic.uptodate = false
 	q := &w.queue
+	if accept := q.AcceptsTransfer("text/uri-list"); accept != w.fileDropEnabled {
+		w.fileDropEnabled = accept
+		w.driver.SetFileDropEnabled(accept)
+	}
 	switch q.TextInputState() {
 	case input.TextInputOpen:
 		w.driver.ShowTextInput(true)
