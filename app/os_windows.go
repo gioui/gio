@@ -54,6 +54,13 @@ type window struct {
 	// the WM_CHAR with its second half arrives.
 	highSurrogate rune
 
+	// Clipboard work waiting for another program to close the clipboard.
+	clipboard struct {
+		read  bool
+		write *clipboardContent
+		tries int
+	}
+
 	borderSize image.Point
 	config     Config
 	// frameDims stores the last seen window frame width and height.
@@ -457,6 +464,12 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 	case _WM_WAKEUP:
 		w.loop.Wakeup()
 		w.loop.FlushEvents()
+	case windows.WM_TIMER:
+		if wParam == clipboardTimer {
+			windows.KillTimer(w.hwnd, clipboardTimer)
+			w.flushClipboard()
+			return 0
+		}
 	case windows.WM_IME_STARTCOMPOSITION:
 		imc := windows.ImmGetContext(w.hwnd)
 		if imc == 0 {
@@ -882,32 +895,53 @@ func (w *window) NewContext() (context, error) {
 }
 
 func (w *window) ReadClipboard() {
-	w.readClipboard()
+	w.clipboard.read = true
+	w.flushClipboard()
 }
 
-func (w *window) readClipboard() (cerr error) {
-	defer func() {
-		if cerr != nil {
-			w.processDataEvent("")
-		}
-	}()
-
-	if err := windows.OpenClipboard(w.hwnd); err != nil {
-		return err
-	}
-	defer windows.CloseClipboard()
+func (w *window) readClipboard() (string, error) {
 	mem, err := windows.GetClipboardData(windows.CF_UNICODETEXT)
 	if err != nil {
-		return err
+		return "", err
 	}
 	ptr, err := windows.GlobalLock(mem)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer windows.GlobalUnlock(mem)
-	content := gowindows.UTF16PtrToString((*uint16)(unsafe.Pointer(ptr)))
-	w.processDataEvent(content)
-	return nil
+	return gowindows.UTF16PtrToString((*uint16)(unsafe.Pointer(ptr))), nil
+}
+
+const clipboardTimer = 1
+
+// flushClipboard does the pending clipboard work. While another program has
+// the clipboard open, it retries with backoff for a few seconds.
+func (w *window) flushClipboard() {
+	if !w.clipboard.read && w.clipboard.write == nil {
+		return
+	}
+	err := windows.OpenClipboard(w.hwnd)
+	if err != nil && w.clipboard.tries < 7 {
+		w.clipboard.tries++
+		windows.SetTimer(w.hwnd, clipboardTimer, 10<<w.clipboard.tries, 0)
+		return
+	}
+	w.clipboard.tries = 0
+	var content string
+	if err == nil {
+		if c := w.clipboard.write; c != nil {
+			w.writeClipboard(string(c.data), c.sensitive)
+		}
+		if w.clipboard.read {
+			content, _ = w.readClipboard()
+		}
+		windows.CloseClipboard()
+	}
+	w.clipboard.write = nil
+	if w.clipboard.read {
+		w.clipboard.read = false
+		w.processDataEvent(content)
+	}
 }
 
 func (w *window) processDataEvent(content string) {
@@ -1021,14 +1055,11 @@ func (w *window) Configure(options []Option) {
 }
 
 func (w *window) WriteClipboard(c clipboardContent) {
-	w.writeClipboard(string(c.data), c.sensitive)
+	w.clipboard.write = &c
+	w.flushClipboard()
 }
 
 func (w *window) writeClipboard(s string, sensitive bool) error {
-	if err := windows.OpenClipboard(w.hwnd); err != nil {
-		return err
-	}
-	defer windows.CloseClipboard()
 	if err := windows.EmptyClipboard(); err != nil {
 		return err
 	}

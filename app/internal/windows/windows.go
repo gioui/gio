@@ -475,6 +475,7 @@ var (
 	_GetWindowLong                = user32.NewProc("GetWindowLongPtrW")
 	_GetWindowLong32              = user32.NewProc("GetWindowLongW")
 	_GetWindowPlacement           = user32.NewProc("GetWindowPlacement")
+	_KillTimer                    = user32.NewProc("KillTimer")
 	_LoadCursor                   = user32.NewProc("LoadCursorW")
 	_LoadImage                    = user32.NewProc("LoadImageW")
 	_MonitorFromPoint             = user32.NewProc("MonitorFromPoint")
@@ -900,7 +901,7 @@ func GlobalUnlock(h syscall.Handle) {
 }
 
 func KillTimer(hwnd syscall.Handle, nIDEvent uintptr) error {
-	r, _, err := _SetTimer.Call(uintptr(hwnd), uintptr(nIDEvent), 0, 0)
+	r, _, err := _KillTimer.Call(uintptr(hwnd), uintptr(nIDEvent))
 	if r == 0 {
 		return fmt.Errorf("KillTimer failed: %v", err)
 	}
