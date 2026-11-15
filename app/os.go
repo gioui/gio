@@ -319,6 +319,13 @@ func (e *eventLoop) FlushEvents() {
 		if !ok {
 			break
 		}
+		if _, ok := evt.(DestroyEvent); ok {
+			// Don't invalidate after destruction.
+			select {
+			case <-e.invalidates:
+			default:
+			}
+		}
 		e.deliverEvent(evt)
 	}
 }
