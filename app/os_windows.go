@@ -383,7 +383,8 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		w.ProcessEvent(DestroyEvent{})
 		w.w = nil
 		if w.hdc != 0 {
-			windows.ReleaseDC(w.hdc)
+			// ReleaseDC has no effect on this window's CS_OWNDC device context.
+			windows.ReleaseDC(w.hwnd, w.hdc)
 			w.hdc = 0
 		}
 		// The system destroys the HWND for us.
