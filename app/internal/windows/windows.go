@@ -728,7 +728,7 @@ func GetSystemDPI() int {
 		if err != nil {
 			return 96
 		}
-		defer ReleaseDC(screenDC)
+		defer ReleaseDC(0, screenDC)
 		return getDeviceCaps(screenDC, LOGPIXELSX)
 	}
 }
@@ -991,8 +991,8 @@ func RegisterClipboardFormat(name string) (uint32, error) {
 	return uint32(r), nil
 }
 
-func ReleaseDC(hdc syscall.Handle) {
-	_ReleaseDC.Call(uintptr(hdc))
+func ReleaseDC(hwnd, hdc syscall.Handle) {
+	_ReleaseDC.Call(uintptr(hwnd), uintptr(hdc))
 }
 
 func SendMessage(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) error {
