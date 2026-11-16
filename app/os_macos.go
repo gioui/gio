@@ -531,8 +531,13 @@ func (w *window) Configure(options []Option) {
 		barTrans = C.YES
 		titleVis = C.NSWindowTitleHidden
 	}
-	if cnf.TopMost {
-		C.setWindowLevel(window, C.NSFloatingWindowLevel)
+	if cnf.TopMost != w.config.TopMost {
+		if cnf.TopMost {
+			C.setWindowLevel(window, C.NSFloatingWindowLevel)
+		} else {
+			C.setWindowLevel(window, C.NSNormalWindowLevel)
+		}
+		w.config.TopMost = cnf.TopMost
 	}
 	C.setWindowTitlebarAppearsTransparent(window, barTrans)
 	C.setWindowTitleVisibility(window, titleVis)
