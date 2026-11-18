@@ -327,14 +327,39 @@ func (e *textView) PaintSelection(gtx layout.Context, material op.CallOp) {
 // PaintText clips and paints the visible text glyph outlines using the provided
 // material to fill the glyphs.
 func (e *textView) PaintText(gtx layout.Context, material op.CallOp) {
+	e.paintText(gtx, material, true)
+}
+
+// PaintSelectedText paints text using material, then repaints the selected
+// regions with selectedMaterial. A zero selectedMaterial is equivalent to
+// PaintText.
+func (e *textView) PaintSelectedText(gtx layout.Context, material, selectedMaterial op.CallOp) {
+	if selectedMaterial == (op.CallOp{}) || e.caret.start == e.caret.end {
+		e.paintText(gtx, material, true)
+		return
+	}
+	e.paintText(gtx, material, true)
+
+	localViewport := image.Rectangle{Max: e.viewSize}
+	docViewport := localViewport.Add(e.scrollOff)
+	e.regions = e.index.locate(docViewport, e.caret.start, e.caret.end, e.regions)
+	for _, region := range e.regions {
+		area := clip.Rect(region.Bounds).Push(gtx.Ops)
+		e.paintText(gtx, selectedMaterial, false)
+		area.Pop()
+	}
+}
+
+func (e *textView) paintText(gtx layout.Context, material op.CallOp, paintBitmaps bool) {
 	m := op.Record(gtx.Ops)
 	viewport := image.Rectangle{
 		Min: e.scrollOff,
 		Max: e.viewSize.Add(e.scrollOff),
 	}
 	it := textIterator{
-		viewport: viewport,
-		material: material,
+		viewport:     viewport,
+		material:     material,
+		paintBitmaps: paintBitmaps,
 	}
 
 	startGlyph := 0
