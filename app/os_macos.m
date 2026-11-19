@@ -14,10 +14,60 @@ __attribute__ ((visibility ("hidden"))) CALayer *gio_layerFactory(BOOL presentWi
 @interface GioWindowDelegate : NSObject<NSWindowDelegate>
 @end
 
-@interface GioView : NSView <CALayerDelegate,NSTextInputClient,NSDraggingDestination>
+@interface GioView : NSView <CALayerDelegate,NSTextInputClient,NSDraggingDestination,NSDraggingSource>
 @property uintptr_t handle;
 @property BOOL presentWithTrans;
+@property (copy) NSArray<NSString *> *dropTypes;
+@property (strong) NSEvent *dragEvent;
+- (NSString *)dropTypeFor:(id<NSDraggingInfo>)sender;
 @end
+
+static NSPasteboardType pasteboardType(NSString *mime) {
+	if ([mime isEqualToString:@"text/plain"]) return NSPasteboardTypeString;
+	if ([mime isEqualToString:@"image/png"]) return NSPasteboardTypePNG;
+	if ([mime isEqualToString:@"text/html"]) return NSPasteboardTypeHTML;
+	return [@"org.gioui.mime." stringByAppendingString:mime];
+}
+
+void gio_setDropTypes(CFTypeRef viewRef, CFTypeRef typesRef) {
+	GioView *view = (__bridge GioView *)viewRef;
+	view.dropTypes = (__bridge NSArray *)typesRef;
+	NSMutableArray *types = [NSMutableArray array];
+	for (NSString *mime in view.dropTypes) {
+		[types addObject:pasteboardType(mime)];
+		if ([mime isEqualToString:@"text/uri-list"]) [types addObjectsFromArray:@[NSPasteboardTypeFileURL, NSFilenamesPboardType]];
+	}
+	[view unregisterDraggedTypes];
+	if (types.count) [view registerForDraggedTypes:types];
+}
+
+void gio_startDrag(CFTypeRef viewRef, CFTypeRef dataRef) {
+	GioView *view = (__bridge GioView *)viewRef;
+	NSDictionary<NSString *, NSData *> *data = (__bridge NSDictionary *)dataRef;
+	NSEvent *event = view.dragEvent;
+	dispatch_async(dispatch_get_main_queue(), ^{
+		if (!view.window || !event || !view.dragEvent || !(NSEvent.pressedMouseButtons & 1)) {
+			if (view.window) gio_onDragEnded(view.handle);
+			return;
+		}
+		NSMutableArray<NSDraggingItem *> *items = [NSMutableArray array];
+		NSPasteboardItem *item = [NSPasteboardItem new];
+		for (NSString *mime in data) [item setData:data[mime] forType:pasteboardType(mime)];
+		[items addObject:[[NSDraggingItem alloc] initWithPasteboardWriter:item]];
+		NSString *uris = [[NSString alloc] initWithData:data[@"text/uri-list"] ?: [NSData data] encoding:NSUTF8StringEncoding];
+		BOOL first = YES;
+		for (NSString *line in [uris componentsSeparatedByCharactersInSet:NSCharacterSet.newlineCharacterSet]) {
+			NSURL *url = [NSURL URLWithString:line];
+			if (!url.isFileURL) continue;
+			if (first) { [item setString:url.absoluteString forType:NSPasteboardTypeFileURL]; first = NO; }
+			else [items addObject:[[NSDraggingItem alloc] initWithPasteboardWriter:url]];
+		}
+		NSPoint point = [view convertPoint:event.locationInWindow fromView:nil];
+		NSImage *preview = [NSImage imageNamed:NSImageNameMultipleDocuments];
+		for (NSDraggingItem *dragItem in items) [dragItem setDraggingFrame:NSMakeRect(point.x, point.y, 24, 24) contents:preview];
+		[view beginDraggingSessionWithItems:items event:event source:view];
+	});
+}
 
 @implementation GioWindowDelegate
 - (BOOL)windowShouldClose:(NSWindow *)window {
@@ -79,13 +129,43 @@ static void handleMouse(GioView *view, NSEvent *event, int typ, CGFloat dx, CGFl
 }
 
 @implementation GioView
+- (NSDragOperation)draggingSession:(NSDraggingSession *)session sourceOperationMaskForDraggingContext:(NSDraggingContext)context {
+	return NSDragOperationCopy;
+}
+- (void)draggingSession:(NSDraggingSession *)session endedAtPoint:(NSPoint)point operation:(NSDragOperation)operation {
+	self.dragEvent = nil;
+	if (self.window) gio_onDragEnded(self.handle);
+}
 - (NSDragOperation)draggingEntered:(id<NSDraggingInfo>)sender {
+	return [self draggingUpdated:sender];
+}
+
+- (NSDragOperation)draggingUpdated:(id<NSDraggingInfo>)sender {
+	return [self dropTypeFor:sender] != nil ? NSDragOperationCopy : NSDragOperationNone;
+}
+
+- (NSString *)dropTypeFor:(id<NSDraggingInfo>)sender {
 	NSPasteboard *pboard = [sender draggingPasteboard];
-	if ([pboard.types containsObject:NSPasteboardTypeFileURL] ||
-	    [pboard.types containsObject:NSFilenamesPboardType]) {
-		return NSDragOperationCopy;
+	NSMutableArray *offered = [NSMutableArray array];
+	for (NSString *mime in self.dropTypes) {
+		if ([pboard.types containsObject:pasteboardType(mime)] ||
+		    ([mime isEqualToString:@"text/uri-list"] && ([pboard.types containsObject:NSPasteboardTypeFileURL] || [pboard.types containsObject:NSFilenamesPboardType]))) {
+			[offered addObject:mime];
+		}
 	}
-	return NSDragOperationNone;
+	NSPoint point = [self convertPoint:sender.draggingLocation fromView:nil];
+	NSInteger index = gio_onPlatformDrag(self.handle, (__bridge CFTypeRef)offered, offered.count, point.x, self.bounds.size.height - point.y);
+	return index >= 0 && (sender.draggingSourceOperationMask & NSDragOperationCopy) ? offered[(NSUInteger)index] : nil;
+}
+
+- (void)draggingExited:(id<NSDraggingInfo>)sender {
+	if (self.window != nil) {
+		gio_onPlatformDragExited(self.handle);
+	}
+}
+
+- (void)draggingEnded:(id<NSDraggingInfo>)sender {
+	[self draggingExited:sender];
 }
 
 - (BOOL)prepareForDragOperation:(id<NSDraggingInfo>)sender {
@@ -93,7 +173,13 @@ static void handleMouse(GioView *view, NSEvent *event, int typ, CGFloat dx, CGFl
 }
 
 - (BOOL)performDragOperation:(id<NSDraggingInfo>)sender {
+	NSPoint point = [self convertPoint:sender.draggingLocation fromView:nil];
 	NSPasteboard *pboard = [sender draggingPasteboard];
+	NSString *mime = [self dropTypeFor:sender];
+	if (!mime) return NO;
+	NSData *data = [pboard dataForType:pasteboardType(mime)];
+	if (data) return gio_onDataDrop(self.handle, (__bridge CFTypeRef)mime, (void *)data.bytes, data.length, point.x, self.bounds.size.height - point.y);
+	if (![mime isEqualToString:@"text/uri-list"]) return NO;
 	NSArray<NSURL *> *urls = [pboard readObjectsForClasses:@[[NSURL class]]
 		options:@{NSPasteboardURLReadingFileURLsOnlyKey: @YES}];
 	NSMutableArray<NSString *> *paths = [NSMutableArray array];
@@ -113,10 +199,8 @@ static void handleMouse(GioView *view, NSEvent *event, int typ, CGFloat dx, CGFl
 	if (paths.count == 0) {
 		return NO;
 	}
-	NSPoint point = [self convertPoint:sender.draggingLocation fromView:nil];
-	gio_onFileDrop(self.handle, (__bridge CFTypeRef)paths, paths.count,
+	return gio_onFileDrop(self.handle, (__bridge CFTypeRef)paths, paths.count,
 		point.x, self.bounds.size.height - point.y);
-	return YES;
 }
 
 - (void)setFrameSize:(NSSize)newSize {
@@ -144,6 +228,7 @@ static void handleMouse(GioView *view, NSEvent *event, int typ, CGFloat dx, CGFl
 	handleMouse(self, event, MOUSE_DOWN, 0, 0);
 }
 - (void)mouseUp:(NSEvent *)event {
+	self.dragEvent = nil;
 	handleMouse(self, event, MOUSE_UP, 0, 0);
 }
 - (void)rightMouseDown:(NSEvent *)event {
@@ -162,6 +247,7 @@ static void handleMouse(GioView *view, NSEvent *event, int typ, CGFloat dx, CGFl
 	handleMouse(self, event, MOUSE_MOVE, 0, 0);
 }
 - (void)mouseDragged:(NSEvent *)event {
+	self.dragEvent = event;
 	handleMouse(self, event, MOUSE_MOVE, 0, 0);
 }
 - (void)rightMouseDragged:(NSEvent *)event {
