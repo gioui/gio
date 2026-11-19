@@ -5,7 +5,6 @@ package app
 import (
 	"errors"
 	"fmt"
-	"gioui.org/io/transfer"
 	syscall "golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 	"image"
@@ -16,6 +15,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode"
 	"unicode/utf16"
@@ -32,6 +32,7 @@ import (
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
+	"gioui.org/io/transfer"
 )
 
 type Win32ViewEvent struct {
@@ -39,9 +40,10 @@ type Win32ViewEvent struct {
 }
 
 type window struct {
-	hwnd syscall.Handle
-	hdc  syscall.Handle
-	w    *callbacks
+	hwnd       syscall.Handle
+	hdc        syscall.Handle
+	w          *callbacks
+	dropTarget *fileDropTarget
 
 	// cursorIn tracks whether the cursor was inside the window according
 	// to the most recent WM_SETCURSOR.
@@ -127,7 +129,11 @@ func newWindow(win *callbacks, options []Option) {
 		}
 		w.loop = newEventLoop(w.w, w.wakeup)
 		w.w.SetDriver(w)
-		err := w.init()
+		err := windows.OleInitialize()
+		if err == nil {
+			defer windows.OleUninitialize()
+			err = w.init()
+		}
 		done <- struct{}{}
 		if err != nil {
 			w.ProcessEvent(DestroyEvent{Err: err})
@@ -379,6 +385,7 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 	case windows.WM_POINTERHWHEEL:
 		w.scrollEvent(wParam, lParam, true, getModifiers())
 	case windows.WM_DESTROY:
+		w.SetFileDropEnabled(false)
 		w.ProcessEvent(Win32ViewEvent{})
 		w.ProcessEvent(DestroyEvent{})
 		w.w = nil
@@ -415,17 +422,6 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 			return 0
 		}
 		szp.Rgrc[0] = mi.WorkArea
-		return 0
-	case windows.WM_DROPFILES:
-		hDrop := syscall.Handle(wParam)
-		defer windows.DragFinish(hDrop)
-		point, client := windows.DragQueryPoint(hDrop)
-		if !client {
-			return 0
-		}
-		if paths := dragQueryFiles(hDrop); len(paths) > 0 {
-			w.ProcessEvent(fileDropEvent(f32.Pt(float32(point.X), float32(point.Y)), paths))
-		}
 		return 0
 	case windows.WM_PAINT:
 		w.draw(true)
@@ -583,6 +579,163 @@ func dragQueryFiles(hDrop syscall.Handle) []string {
 		}
 	}
 	return paths
+}
+
+// fileDropTarget is the window's IDropTarget. OLE keeps references to it, so
+// its memory is allocated outside the Go heap.
+type fileDropTarget struct {
+	vtbl     *[7]uintptr
+	hwnd     syscall.Handle
+	refs     int32
+	hasFiles bool
+}
+
+var (
+	fileDropOnce sync.Once
+	fileDropVtbl [7]uintptr
+
+	// IUnknown and IDropTarget are defined in the Windows SDK's unknwn.h and oleidl.h.
+	iidUnknown     = syscall.GUID{Data4: [8]byte{0xc0, 0, 0, 0, 0, 0, 0, 0x46}}
+	iidDropTarget  = syscall.GUID{Data1: 0x122, Data4: [8]byte{0xc0, 0, 0, 0, 0, 0, 0, 0x46}}
+	fileDropFormat = windows.FormatEtc{
+		Format: windows.CF_HDROP,
+		Aspect: windows.DVASPECT_CONTENT,
+		Index:  -1,
+		Tymed:  windows.TYMED_HGLOBAL,
+	}
+)
+
+func initFileDrop() {
+	fileDropVtbl[0] = syscall.NewCallback(func(t *fileDropTarget, iid *syscall.GUID, out **fileDropTarget) uintptr {
+		if out == nil {
+			return uintptr(syscall.E_POINTER)
+		}
+		*out = nil
+		if *iid != iidUnknown && *iid != iidDropTarget {
+			return uintptr(syscall.E_NOINTERFACE)
+		}
+		*out = t
+		fileDropAddRef(t)
+		return 0
+	})
+	fileDropVtbl[1] = syscall.NewCallback(fileDropAddRef)
+	fileDropVtbl[2] = syscall.NewCallback(fileDropRelease)
+	fileDropVtbl[5] = syscall.NewCallback(func(t *fileDropTarget) uintptr {
+		fileDropAddRef(t)
+		defer fileDropRelease(t)
+		t.hasFiles = false
+		if win, ok := winMap.Load(t.hwnd); ok {
+			w := win.(*window)
+			if w.dropTarget == t {
+				w.fileDragEvent(transfer.CancelEvent{})
+			}
+		}
+		return 0
+	})
+	// POINTL is passed by value: one register on 64-bit Windows, two stack
+	// arguments on 32-bit Windows.
+	if unsafe.Sizeof(uintptr(0)) == 8 {
+		fileDropVtbl[3] = syscall.NewCallback(func(t *fileDropTarget, data *windows.DataObject, keys, point uintptr, effect *uint32) uintptr {
+			return fileDropUpdate(t, data, windows.Point{X: int32(point), Y: int32(uint64(point) >> 32)}, effect, false)
+		})
+		fileDropVtbl[4] = syscall.NewCallback(func(t *fileDropTarget, keys, point uintptr, effect *uint32) uintptr {
+			return fileDropUpdate(t, nil, windows.Point{X: int32(point), Y: int32(uint64(point) >> 32)}, effect, false)
+		})
+		fileDropVtbl[6] = syscall.NewCallback(func(t *fileDropTarget, data *windows.DataObject, keys, point uintptr, effect *uint32) uintptr {
+			return fileDropUpdate(t, data, windows.Point{X: int32(point), Y: int32(uint64(point) >> 32)}, effect, true)
+		})
+	} else {
+		fileDropVtbl[3] = syscall.NewCallback(func(t *fileDropTarget, data *windows.DataObject, keys, x, y uintptr, effect *uint32) uintptr {
+			return fileDropUpdate(t, data, windows.Point{X: int32(x), Y: int32(y)}, effect, false)
+		})
+		fileDropVtbl[4] = syscall.NewCallback(func(t *fileDropTarget, keys, x, y uintptr, effect *uint32) uintptr {
+			return fileDropUpdate(t, nil, windows.Point{X: int32(x), Y: int32(y)}, effect, false)
+		})
+		fileDropVtbl[6] = syscall.NewCallback(func(t *fileDropTarget, data *windows.DataObject, keys, x, y uintptr, effect *uint32) uintptr {
+			return fileDropUpdate(t, data, windows.Point{X: int32(x), Y: int32(y)}, effect, true)
+		})
+	}
+}
+
+func fileDropAddRef(t *fileDropTarget) uintptr {
+	return uintptr(atomic.AddInt32(&t.refs, 1))
+}
+
+func fileDropRelease(t *fileDropTarget) uintptr {
+	refs := atomic.AddInt32(&t.refs, -1)
+	if refs == 0 {
+		syscall.LocalFree(syscall.Handle(uintptr(unsafe.Pointer(t))))
+	}
+	return uintptr(refs)
+}
+
+func fileDropUpdate(t *fileDropTarget, data *windows.DataObject, point windows.Point, effect *uint32, drop bool) uintptr {
+	fileDropAddRef(t)
+	defer fileDropRelease(t)
+	allowed := *effect
+	*effect = 0
+	win, ok := winMap.Load(t.hwnd)
+	if !ok {
+		return 0
+	}
+	w := win.(*window)
+	if w.dropTarget != t {
+		return 0
+	}
+	if data != nil {
+		t.hasFiles = data.QueryGetData(&fileDropFormat)
+		if !drop && t.hasFiles {
+			w.fileDragEvent(transfer.InitiateEvent{Types: []string{"text/uri-list"}})
+		}
+	}
+	if w.dropTarget != t {
+		return 0
+	}
+	if !t.hasFiles {
+		w.fileDragEvent(transfer.CancelEvent{})
+		return 0
+	}
+	windows.ScreenToClient(w.hwnd, &point)
+	position := f32.Pt(float32(point.X), float32(point.Y))
+	if !drop {
+		w.fileDragEvent(pointer.Event{Kind: pointer.Drag, Source: pointer.Mouse, Position: position})
+	}
+	accept := w.dropTarget == t && allowed&windows.DROPEFFECT_COPY != 0 &&
+		w.w.AcceptsTransferAt("text/uri-list", position)
+	if !drop {
+		if accept {
+			*effect = windows.DROPEFFECT_COPY
+		}
+		return 0
+	}
+	t.hasFiles = false
+	if accept {
+		w.fileDragEvent(pointer.Event{Kind: pointer.Drag, Source: pointer.Mouse, Position: position})
+		medium, err := data.GetData(&fileDropFormat)
+		if err == nil {
+			defer windows.ReleaseStgMedium(&medium)
+			if w.dropTarget == t && medium.Tymed == windows.TYMED_HGLOBAL && medium.Handle != 0 &&
+				w.w.AcceptsTransferAt("text/uri-list", position) {
+				if paths := dragQueryFiles(medium.Handle); len(paths) > 0 {
+					w.fileDragEvent(fileDropEvent(paths))
+					*effect = windows.DROPEFFECT_COPY
+					return 0
+				}
+			}
+		}
+	}
+	if w.dropTarget == t {
+		w.fileDragEvent(transfer.CancelEvent{})
+	}
+	return 0
+}
+
+func (w *window) fileDragEvent(e event.Event) {
+	w.ProcessEvent(e)
+	// OLE runs its own message loop while dragging.
+	if w.animating && w.hwnd != 0 {
+		w.draw(false)
+	}
 }
 
 // getModifiers reports the currently pressed modifier keys.
@@ -1165,7 +1318,31 @@ func loadCursor(cursor pointer.Cursor) (syscall.Handle, error) {
 }
 
 func (w *window) SetFileDropEnabled(enabled bool) {
-	windows.DragAcceptFiles(w.hwnd, enabled)
+	if enabled == (w.dropTarget != nil) {
+		return
+	}
+	if !enabled {
+		target := w.dropTarget
+		w.dropTarget = nil
+		if err := windows.RevokeDragDrop(w.hwnd); err != nil {
+			panic(err)
+		}
+		fileDropRelease(target)
+		w.w.ProcessEvent(transfer.CancelEvent{})
+		return
+	}
+	fileDropOnce.Do(initFileDrop)
+	ptr, err := syscall.LocalAlloc(syscall.LPTR, uint32(unsafe.Sizeof(fileDropTarget{})))
+	if err != nil {
+		panic(err)
+	}
+	target := (*fileDropTarget)(unsafe.Pointer(ptr))
+	target.vtbl, target.hwnd, target.refs = &fileDropVtbl, w.hwnd, 1
+	if err := windows.RegisterDragDrop(w.hwnd, unsafe.Pointer(target)); err != nil {
+		fileDropRelease(target)
+		panic(err)
+	}
+	w.dropTarget = target
 }
 
 func (w *window) ShowTextInput(show bool) {

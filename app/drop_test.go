@@ -6,8 +6,6 @@ import (
 	"io"
 	"path/filepath"
 	"testing"
-
-	"gioui.org/f32"
 )
 
 func TestFileDropEvent(t *testing.T) {
@@ -33,9 +31,8 @@ func TestFileDropEvent(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			pos := f32.Pt(12, 34)
-			e := fileDropEvent(pos, test.paths)
-			if e.Type != "text/uri-list" || e.Position != pos {
+			e := fileDropEvent(test.paths)
+			if e.Type != "text/uri-list" {
 				t.Fatalf("unexpected drop: %#v", e)
 			}
 			// Replaying the event must not reuse an exhausted reader.

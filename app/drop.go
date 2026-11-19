@@ -8,11 +8,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gioui.org/f32"
-	"gioui.org/io/input"
+	"gioui.org/io/transfer"
 )
 
-func fileDropEvent(pos f32.Point, paths []string) input.DropEvent {
+func fileDropEvent(paths []string) transfer.DataEvent {
 	var data strings.Builder
 	for _, path := range paths {
 		path = filepath.ToSlash(path)
@@ -31,9 +30,8 @@ func fileDropEvent(pos f32.Point, paths []string) input.DropEvent {
 		data.WriteString("\r\n")
 	}
 	list := data.String()
-	return input.DropEvent{
-		Position: pos,
-		Type:     "text/uri-list",
+	return transfer.DataEvent{
+		Type: "text/uri-list",
 		Open: func() io.ReadCloser {
 			return io.NopCloser(strings.NewReader(list))
 		},

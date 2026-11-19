@@ -7,6 +7,7 @@ package windows
 import (
 	"fmt"
 	"runtime"
+	stdsyscall "syscall"
 	"time"
 	"unicode/utf16"
 	"unsafe"
@@ -29,6 +30,27 @@ type CandidateForm struct {
 
 type Rect struct {
 	Left, Top, Right, Bottom int32
+}
+
+type FormatEtc struct {
+	Format uint16
+	Device uintptr
+	Aspect uint32
+	Index  int32
+	Tymed  uint32
+}
+
+type StgMedium struct {
+	Tymed         uint32
+	Handle        syscall.Handle
+	UnkForRelease uintptr
+}
+
+type DataObject struct {
+	Vtbl *struct {
+		QueryInterface, AddRef, Release    uintptr
+		GetData, GetDataHere, QueryGetData uintptr
+	}
 }
 
 type WndClassEx struct {
@@ -373,7 +395,6 @@ const (
 	WM_NCPOINTERUPDATE       = 0x0241
 	WM_NCPOINTERDOWN         = 0x0242
 	WM_NCPOINTERUP           = 0x0243
-	WM_DROPFILES             = 0x0233
 	WM_PAINT                 = 0x000F
 	WM_POINTERCAPTURECHANGED = 0x024C
 	WM_POINTERDOWN           = 0x0246
@@ -426,10 +447,14 @@ const (
 
 	GHND = 0x0042
 
-	CF_UNICODETEXT = 13
-	IMAGE_BITMAP   = 0
-	IMAGE_ICON     = 1
-	IMAGE_CURSOR   = 2
+	CF_UNICODETEXT   = 13
+	CF_HDROP         = 15
+	DVASPECT_CONTENT = 1
+	TYMED_HGLOBAL    = 1
+	DROPEFFECT_COPY  = 1
+	IMAGE_BITMAP     = 0
+	IMAGE_ICON       = 1
+	IMAGE_CURSOR     = 2
 
 	LR_CREATEDIBSECTION = 0x00002000
 	LR_DEFAULTCOLOR     = 0x00000000
@@ -527,24 +552,65 @@ var (
 	dwmapi                        = syscall.NewLazySystemDLL("dwmapi")
 	_DwmExtendFrameIntoClientArea = dwmapi.NewProc("DwmExtendFrameIntoClientArea")
 
-	shell32          = syscall.NewLazySystemDLL("shell32")
-	_DragAcceptFiles = shell32.NewProc("DragAcceptFiles")
-	_DragQueryFileW  = shell32.NewProc("DragQueryFileW")
-	_DragQueryPoint  = shell32.NewProc("DragQueryPoint")
-	_DragFinish      = shell32.NewProc("DragFinish")
+	shell32         = syscall.NewLazySystemDLL("shell32")
+	_DragQueryFileW = shell32.NewProc("DragQueryFileW")
+
+	ole32             = syscall.NewLazySystemDLL("ole32")
+	_OleInitialize    = ole32.NewProc("OleInitialize")
+	_OleUninitialize  = ole32.NewProc("OleUninitialize")
+	_RegisterDragDrop = ole32.NewProc("RegisterDragDrop")
+	_RevokeDragDrop   = ole32.NewProc("RevokeDragDrop")
+	_ReleaseStgMedium = ole32.NewProc("ReleaseStgMedium")
 )
+
+func OleInitialize() error {
+	r, _, _ := _OleInitialize.Call(0)
+	if int32(r) < 0 {
+		return fmt.Errorf("OleInitialize: %#x", uint32(r))
+	}
+	return nil
+}
+
+func OleUninitialize() {
+	_OleUninitialize.Call()
+}
+
+func RegisterDragDrop(hwnd syscall.Handle, target unsafe.Pointer) error {
+	r, _, _ := _RegisterDragDrop.Call(uintptr(hwnd), uintptr(target))
+	if int32(r) < 0 {
+		return fmt.Errorf("RegisterDragDrop: %#x", uint32(r))
+	}
+	return nil
+}
+
+func RevokeDragDrop(hwnd syscall.Handle) error {
+	r, _, _ := _RevokeDragDrop.Call(uintptr(hwnd))
+	if int32(r) < 0 {
+		return fmt.Errorf("RevokeDragDrop: %#x", uint32(r))
+	}
+	return nil
+}
+
+func ReleaseStgMedium(medium *StgMedium) {
+	_ReleaseStgMedium.Call(uintptr(unsafe.Pointer(medium)))
+}
+
+func (d *DataObject) QueryGetData(format *FormatEtc) bool {
+	r, _, _ := stdsyscall.SyscallN(d.Vtbl.QueryGetData, uintptr(unsafe.Pointer(d)), uintptr(unsafe.Pointer(format)))
+	return int32(r) == 0
+}
+
+func (d *DataObject) GetData(format *FormatEtc) (StgMedium, error) {
+	var medium StgMedium
+	r, _, _ := stdsyscall.SyscallN(d.Vtbl.GetData, uintptr(unsafe.Pointer(d)), uintptr(unsafe.Pointer(format)), uintptr(unsafe.Pointer(&medium)))
+	if int32(r) < 0 {
+		return medium, fmt.Errorf("IDataObject.GetData: %#x", uint32(r))
+	}
+	return medium, nil
+}
 
 func AdjustWindowRectEx(r *Rect, dwStyle uint32, bMenu int, dwExStyle uint32) {
 	_AdjustWindowRectEx.Call(uintptr(unsafe.Pointer(r)), uintptr(dwStyle), uintptr(bMenu), uintptr(dwExStyle))
-}
-
-// DragAcceptFiles enables or disables file drops for a window.
-func DragAcceptFiles(hwnd syscall.Handle, accept bool) {
-	var enabled uintptr
-	if accept {
-		enabled = 1
-	}
-	_DragAcceptFiles.Call(uintptr(hwnd), enabled)
 }
 
 func DragQueryFile(hDrop syscall.Handle, index uint32, buf []uint16) uint32 {
@@ -555,17 +621,6 @@ func DragQueryFile(hDrop syscall.Handle, index uint32, buf []uint16) uint32 {
 		uintptr(len(buf)),
 	)
 	return uint32(r)
-}
-
-// DragQueryPoint reports the drop position and whether it is in the client area.
-func DragQueryPoint(hDrop syscall.Handle) (Point, bool) {
-	var point Point
-	r, _, _ := _DragQueryPoint.Call(uintptr(hDrop), uintptr(unsafe.Pointer(&point)))
-	return point, r != 0
-}
-
-func DragFinish(hDrop syscall.Handle) {
-	_DragFinish.Call(uintptr(hDrop))
 }
 
 func CallMsgFilter(m *Msg, nCode uintptr) bool {

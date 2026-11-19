@@ -521,6 +521,10 @@ func (c *callbacks) ActionAt(p f32.Point) (system.Action, bool) {
 	return c.w.queue.ActionAt(p)
 }
 
+func (c *callbacks) AcceptsTransferAt(mime string, p f32.Point) bool {
+	return c.w.queue.AcceptsTransferAt(mime, p)
+}
+
 func (w *Window) destroyGPU() {
 	if w.gpu != nil {
 		w.ctx.Lock()

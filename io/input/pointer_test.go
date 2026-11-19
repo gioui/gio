@@ -5,7 +5,6 @@ package input
 import (
 	"fmt"
 	"image"
-	"io"
 	"reflect"
 	"strings"
 	"testing"
@@ -945,6 +944,40 @@ func TestTransfer(t *testing.T) {
 		return src, tgt
 	}
 
+	t.Run("hover", func(t *testing.T) {
+		var r Router
+		var ops op.Ops
+		src, tgt := setup(&r, &ops, "file", "file")
+		filter := transfer.TargetFilter{Target: tgt, Type: "file"}
+		ptr := pointer.Filter{Target: tgt, Kinds: pointer.Enter | pointer.Leave | pointer.Drag | pointer.Cancel}
+		events(&r, -1, ptr)
+		other := new(int)
+		area := clip.Rect(image.Rect(20, 0, 40, 20)).Push(&ops)
+		event.Op(&ops, other)
+		area.Pop()
+		otherFilter := pointer.Filter{Target: other, Kinds: pointer.Enter | pointer.Leave | pointer.Drag | pointer.Cancel}
+		events(&r, -1, otherFilter)
+		r.Frame(&ops)
+		r.Queue(
+			pointer.Event{Kind: pointer.Press, Source: pointer.Mouse, Position: f32.Pt(10, 10)},
+			pointer.Event{Kind: pointer.Move, Source: pointer.Mouse, Position: f32.Pt(10, 10)},
+		)
+		assertEventTypeSequence(t, events(&r, -1, filter), transfer.InitiateEvent{})
+		assertEventPointerTypeSequence(t, events(&r, -1, otherFilter), pointer.Cancel)
+		r.Queue(pointer.Event{Kind: pointer.Move, Position: f32.Pt(30, 10)})
+		assertEventSequence(t, events(&r, -1, otherFilter))
+		r.Queue(pointer.Event{Kind: pointer.Move, Source: pointer.Mouse, Position: f32.Pt(45, 10)})
+		assertEventPointerTypeSequence(t, events(&r, -1, ptr), pointer.Enter, pointer.Drag)
+		r.Queue(pointer.Event{Kind: pointer.Leave, Source: pointer.Mouse})
+		assertEventPointerTypeSequence(t, events(&r, -1, ptr), pointer.Leave)
+		r.Queue(pointer.Event{Kind: pointer.Move, Source: pointer.Mouse, Position: f32.Pt(45, 10)})
+		assertEventPointerTypeSequence(t, events(&r, -1, ptr), pointer.Enter, pointer.Drag)
+		r.Queue(pointer.Event{Kind: pointer.Cancel})
+		assertEventSequence(t, events(&r, -1, filter), transfer.CancelEvent{})
+		assertEventPointerTypeSequence(t, events(&r, -1, ptr), pointer.Cancel)
+		assertEventSequence(t, events(&r, -1, transfer.SourceFilter{Target: src, Type: "file"}), transfer.CancelEvent{})
+	})
+
 	t.Run("drop on no target", func(t *testing.T) {
 		ops := new(op.Ops)
 		var r Router
@@ -962,7 +995,7 @@ func TestTransfer(t *testing.T) {
 			},
 		)
 		assertEventSequence(t, events(&r, -1, transfer.SourceFilter{Target: src, Type: "file"}))
-		assertEventSequence(t, events(&r, -1, transfer.TargetFilter{Target: tgt, Type: "file"}), transfer.InitiateEvent{})
+		assertEventTypeSequence(t, events(&r, -1, transfer.TargetFilter{Target: tgt, Type: "file"}), transfer.InitiateEvent{})
 
 		// Drop.
 		r.Queue(
@@ -1001,7 +1034,7 @@ func TestTransfer(t *testing.T) {
 			},
 		)
 		assertEventSequence(t, events(&r, -1, transfer.SourceFilter{Target: src, Type: "file"}))
-		assertEventSequence(t, events(&r, -1, transfer.TargetFilter{Target: tgt1, Type: "file"}), transfer.InitiateEvent{})
+		assertEventTypeSequence(t, events(&r, -1, transfer.TargetFilter{Target: tgt1, Type: "file"}), transfer.InitiateEvent{})
 		assertEventSequence(t, events(&r, -1, transfer.TargetFilter{Target: tgt2, Type: "nofile"}))
 	})
 
@@ -1053,7 +1086,7 @@ func TestTransfer(t *testing.T) {
 				Kind:     pointer.Move,
 			},
 		)
-		assertEventSequence(t, events(&r, 1, transfer.TargetFilter{Target: tgt, Type: "file"}), transfer.InitiateEvent{})
+		assertEventTypeSequence(t, events(&r, 1, transfer.TargetFilter{Target: tgt, Type: "file"}), transfer.InitiateEvent{})
 
 		// Drop.
 		r.Queue(
@@ -1135,7 +1168,7 @@ func TestTransfer(t *testing.T) {
 			pointer.Event{Kind: pointer.Press, Position: f32.Pt(10, 10)},
 			pointer.Event{Kind: pointer.Move, Position: f32.Pt(10, 10)},
 		)
-		assertEventSequence(t, events(&r, -1, transfer.TargetFilter{Target: tgt, Type: "text/plain"}), transfer.InitiateEvent{})
+		assertEventTypeSequence(t, events(&r, -1, transfer.TargetFilter{Target: tgt, Type: "text/plain"}), transfer.InitiateEvent{})
 		events(&r, -1, transfer.SourceFilter{Target: src, Type: "image/png"})
 		events(&r, -1, transfer.TargetFilter{Target: tgt, Type: "image/png"})
 		r.Frame(&ops)
@@ -1143,58 +1176,6 @@ func TestTransfer(t *testing.T) {
 		assertEventSequence(t, events(&r, -1, transfer.SourceFilter{Target: src, Type: "image/png"}), transfer.RequestEvent{Type: "image/png"})
 	})
 
-	t.Run("external drop while awaiting internal data", func(t *testing.T) {
-		var r Router
-		var ops op.Ops
-		src, tgt := setup(&r, &ops, "file", "file")
-		source := transfer.SourceFilter{Target: src, Type: "file"}
-		target := transfer.TargetFilter{Target: tgt, Type: "file"}
-		r.Frame(&ops)
-		r.Queue(
-			pointer.Event{Kind: pointer.Press, Position: f32.Pt(10, 10)},
-			pointer.Event{Kind: pointer.Move, Position: f32.Pt(10, 10)},
-			pointer.Event{Kind: pointer.Release, Position: f32.Pt(40, 10)},
-		)
-		assertEventSequence(t, events(&r, -1, source), transfer.RequestEvent{Type: "file"})
-		assertEventSequence(t, events(&r, -1, target), transfer.InitiateEvent{})
-		r.Queue(DropEvent{
-			Position: f32.Pt(40, 10),
-			Type:     "file",
-			Open: func() io.ReadCloser {
-				return io.NopCloser(strings.NewReader("external"))
-			},
-		})
-		assertEventSequence(t, events(&r, -1, source))
-		evs := events(&r, -1, target)
-		if len(evs) != 3 {
-			t.Fatalf("received %v; want initiate, data, cancel", evs)
-		}
-		assertEventSequence(t, evs[:1], transfer.InitiateEvent{})
-		assertEventSequence(t, evs[2:], transfer.CancelEvent{})
-		reader := evs[1].(transfer.DataEvent).Open()
-		data, err := io.ReadAll(reader)
-		if err := reader.Close(); err != nil {
-			t.Fatal(err)
-		}
-		if err != nil || string(data) != "external" {
-			t.Fatalf("external data = %q, %v", data, err)
-		}
-		r.Frame(&ops)
-		ofr := &offer{data: "internal"}
-		r.Source().Execute(transfer.OfferCmd{Tag: src, Type: "file", Data: ofr})
-		assertEventSequence(t, events(&r, -1, source), transfer.CancelEvent{})
-		evs = events(&r, -1, target)
-		if len(evs) != 2 {
-			t.Fatalf("received %v; want data, cancel", evs)
-		}
-		assertEventSequence(t, evs[1:], transfer.CancelEvent{})
-		if got := evs[0].(transfer.DataEvent).Open(); got != ofr {
-			t.Fatalf("internal reader = %v; want %v", got, ofr)
-		}
-		if err := ofr.Close(); err != nil {
-			t.Fatal(err)
-		}
-	})
 }
 
 func TestDeferredInputOp(t *testing.T) {

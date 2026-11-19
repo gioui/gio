@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -125,11 +126,15 @@ type wlSeat struct {
 	keyboardFocus *window
 	touchFoci     map[C.int32_t]*window
 
-	// Clipboard support.
+	// Clipboard and drag-and-drop support.
 	dataDev *C.struct_wl_data_device
-	// offers is a map from active wl_data_offers to
-	// the list of mime types they support.
-	offers map[*C.struct_wl_data_offer][]string
+	offers  map[*C.struct_wl_data_offer]*wlDataOffer
+	drag    struct {
+		focus    *window
+		offer    *C.struct_wl_data_offer
+		serial   C.uint32_t
+		position f32.Point
+	}
 	// clipboard is the wl_data_offer for the clipboard.
 	clipboard *C.struct_wl_data_offer
 	// mimeType is the chosen mime type of clipboard.
@@ -139,6 +144,14 @@ type wlSeat struct {
 	source *C.struct_wl_data_source
 	// content is the content belonging to source.
 	content clipboardContent
+}
+
+type wlDataOffer struct {
+	types  []string
+	action C.uint32_t
+	readFD int // -1 when no transfer is pending.
+	window *window
+	data   []byte
 }
 
 type repeatState struct {
@@ -217,7 +230,9 @@ type window struct {
 	wsize        image.Point // window config size before going fullscreen or maximized
 	inCompositor bool        // window is moving or being resized
 
-	clipReads chan transfer.DataEvent
+	clipReads       chan transfer.DataEvent
+	fileDropEnabled bool
+	fileDrag        *wlDataOffer
 
 	wakeups chan struct{}
 
@@ -483,14 +498,12 @@ func gio_onSeatCapabilities(data unsafe.Pointer, seat *C.struct_wl_seat, caps C.
 	s.updateCaps(caps)
 }
 
-// flushOffers remove all wl_data_offers that isn't the clipboard
-// content.
+// flushOffers releases offers that are no longer in use.
 func (s *wlSeat) flushOffers() {
-	for o := range s.offers {
-		if o == s.clipboard {
+	for o, offer := range s.offers {
+		if o == s.clipboard || o == s.drag.offer || offer.readFD >= 0 {
 			continue
 		}
-		// We're only interested in clipboard offers.
 		delete(s.offers, o)
 		callbackDelete(unsafe.Pointer(o))
 		C.wl_data_offer_destroy(o)
@@ -518,6 +531,20 @@ func (s *wlSeat) destroy() {
 		C.wl_keyboard_release(s.keyboard)
 	}
 	s.clipboard = nil
+	if w := s.drag.focus; w != nil {
+		w.cancelFileDrag()
+	}
+	s.drag.focus = nil
+	s.drag.offer = nil
+	for _, offer := range s.offers {
+		if offer.readFD >= 0 {
+			if offer.window != nil && offer.window.fileDrag == offer {
+				offer.window.cancelFileDrag()
+			}
+			syscall.Close(offer.readFD)
+			offer.readFD = -1
+		}
+	}
 	s.flushOffers()
 	if s.dataDev != nil {
 		C.wl_data_device_release(s.dataDev)
@@ -718,7 +745,7 @@ func gio_onRegistryGlobal(data unsafe.Pointer, reg *C.struct_wl_registry, name C
 			disp:      d,
 			name:      name,
 			seat:      s,
-			offers:    make(map[*C.struct_wl_data_offer][]string),
+			offers:    make(map[*C.struct_wl_data_offer]*wlDataOffer),
 			touchFoci: make(map[C.int32_t]*window),
 		}
 		callbackStore(unsafe.Pointer(s), d.seat)
@@ -745,7 +772,8 @@ func gio_onRegistryGlobal(data unsafe.Pointer, reg *C.struct_wl_registry, name C
 //export gio_onDataOfferOffer
 func gio_onDataOfferOffer(data unsafe.Pointer, offer *C.struct_wl_data_offer, mime *C.char) {
 	s := callbackLoad(data).(*wlSeat)
-	s.offers[offer] = append(s.offers[offer], C.GoString(mime))
+	o := s.offers[offer]
+	o.types = append(o.types, C.GoString(mime))
 }
 
 //export gio_onDataOfferSourceActions
@@ -754,6 +782,8 @@ func gio_onDataOfferSourceActions(data unsafe.Pointer, offer *C.struct_wl_data_o
 
 //export gio_onDataOfferAction
 func gio_onDataOfferAction(data unsafe.Pointer, offer *C.struct_wl_data_offer, act C.uint32_t) {
+	s := callbackLoad(data).(*wlSeat)
+	s.offers[offer].action = act
 }
 
 //export gio_onDataDeviceOffer
@@ -761,26 +791,108 @@ func gio_onDataDeviceOffer(data unsafe.Pointer, dataDev *C.struct_wl_data_device
 	s := callbackLoad(data).(*wlSeat)
 	callbackStore(unsafe.Pointer(id), s)
 	C.wl_data_offer_add_listener(id, &C.gio_data_offer_listener, unsafe.Pointer(id))
-	s.offers[id] = nil
+	s.offers[id] = &wlDataOffer{readFD: -1}
 }
 
 //export gio_onDataDeviceEnter
 func gio_onDataDeviceEnter(data unsafe.Pointer, dataDev *C.struct_wl_data_device, serial C.uint32_t, surf *C.struct_wl_surface, x, y C.wl_fixed_t, id *C.struct_wl_data_offer) {
 	s := callbackLoad(data).(*wlSeat)
 	s.serial = serial
+	s.drag.focus = callbackLoad(unsafe.Pointer(surf)).(*window)
+	s.drag.offer = id
+	s.drag.serial = serial
+	s.drag.position = f32.Pt(fromFixed(x), fromFixed(y)).Mul(float32(s.drag.focus.scale))
 	s.flushOffers()
+	if id != nil {
+		C.wl_data_offer_set_actions(id, C.WL_DATA_DEVICE_MANAGER_DND_ACTION_COPY, C.WL_DATA_DEVICE_MANAGER_DND_ACTION_COPY)
+	}
+	s.updateDrag(true)
 }
 
 //export gio_onDataDeviceLeave
 func gio_onDataDeviceLeave(data unsafe.Pointer, dataDev *C.struct_wl_data_device) {
+	s := callbackLoad(data).(*wlSeat)
+	if w := s.drag.focus; w != nil && w.fileDrag == s.offers[s.drag.offer] {
+		w.cancelFileDrag()
+	}
+	s.drag.focus = nil
+	s.drag.offer = nil
+	s.flushOffers()
 }
 
 //export gio_onDataDeviceMotion
 func gio_onDataDeviceMotion(data unsafe.Pointer, dataDev *C.struct_wl_data_device, t C.uint32_t, x, y C.wl_fixed_t) {
+	s := callbackLoad(data).(*wlSeat)
+	if w := s.drag.focus; w != nil {
+		s.drag.position = f32.Pt(fromFixed(x), fromFixed(y)).Mul(float32(w.scale))
+		s.updateDrag(true)
+	}
 }
 
 //export gio_onDataDeviceDrop
 func gio_onDataDeviceDrop(data unsafe.Pointer, dataDev *C.struct_wl_data_device) {
+	s := callbackLoad(data).(*wlSeat)
+	defer func() {
+		if s.drag.focus != nil {
+			gio_onDataDeviceLeave(data, dataDev)
+		}
+	}()
+	w, id := s.drag.focus, s.drag.offer
+	if w == nil || id == nil {
+		return
+	}
+	offer := s.offers[id]
+	if w.fileDrag != offer || offer.action != C.WL_DATA_DEVICE_MANAGER_DND_ACTION_COPY {
+		return
+	}
+	if !slices.Contains(offer.types, "text/uri-list") ||
+		!w.w.AcceptsTransferAt("text/uri-list", s.drag.position) {
+		return
+	}
+	var fds [2]int
+	if err := syscall.Pipe2(fds[:], syscall.O_CLOEXEC); err != nil {
+		return
+	}
+	defer syscall.Close(fds[1])
+	// Keep the source's write end blocking; poll only the read end.
+	if err := syscall.SetNonblock(fds[0], true); err != nil {
+		syscall.Close(fds[0])
+		return
+	}
+	mime := C.CString("text/uri-list")
+	C.wl_data_offer_receive(id, mime, C.int(fds[1]))
+	C.free(unsafe.Pointer(mime))
+	offer.readFD = fds[0]
+	offer.window = w
+	s.drag.focus = nil
+	s.drag.offer = nil
+}
+
+func (s *wlSeat) updateDrag(sendEvent bool) {
+	w, id := s.drag.focus, s.drag.offer
+	if w == nil || id == nil {
+		return
+	}
+	offer := s.offers[id]
+	fileDrag := w.fileDropEnabled && slices.Contains(offer.types, "text/uri-list")
+	if !fileDrag {
+		w.cancelFileDrag()
+	} else if w.fileDrag != offer {
+		w.cancelFileDrag()
+		w.fileDrag = offer
+		w.ProcessEvent(transfer.InitiateEvent{Types: []string{"text/uri-list"}})
+		sendEvent = true
+	}
+	if sendEvent && fileDrag {
+		w.ProcessEvent(pointer.Event{Kind: pointer.Drag, Source: pointer.Mouse, Position: s.drag.position})
+	}
+	var mime *C.char
+	if fileDrag &&
+		w.w.AcceptsTransferAt("text/uri-list", s.drag.position) {
+		mime = C.CString("text/uri-list")
+		defer C.free(unsafe.Pointer(mime))
+	}
+	C.wl_data_offer_accept(id, s.drag.serial, mime)
 }
 
 //export gio_onDataDeviceSelection
@@ -788,9 +900,12 @@ func gio_onDataDeviceSelection(data unsafe.Pointer, dataDev *C.struct_wl_data_de
 	s := callbackLoad(data).(*wlSeat)
 	defer s.flushOffers()
 	s.clipboard = nil
+	if id == nil {
+		return
+	}
 loop:
 	for _, want := range clipboardMimeTypes {
-		for _, got := range s.offers[id] {
+		for _, got := range s.offers[id].types {
 			if want != got {
 				continue
 			}
@@ -1496,6 +1611,10 @@ func (w *window) Run(f func()) {
 
 func (w *window) Frame(frame *op.Ops) {
 	w.w.ProcessFrame(frame, nil)
+	if s := w.disp.seat; s != nil && s.drag.focus == w {
+		// Update acceptance without queuing another drag event.
+		s.updateDrag(false)
+	}
 }
 
 // bindDataDevice initializes the dataDev field if and only if both
@@ -1517,14 +1636,21 @@ func (d *wlDisplay) dispatch() error {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
+	for C.wl_display_prepare_read(d.disp) != 0 {
+		C.wl_display_dispatch_pending(d.disp)
+	}
 	dispfd := C.wl_display_get_fd(d.disp)
 	// Poll for events and notifications.
 	pollfds := append(d.poller.pollfds[:0],
 		syscall.PollFd{Fd: int32(dispfd), Events: syscall.POLLIN | syscall.POLLERR},
 		syscall.PollFd{Fd: int32(d.notify.read), Events: syscall.POLLIN | syscall.POLLERR},
 	)
-	for C.wl_display_prepare_read(d.disp) != 0 {
-		C.wl_display_dispatch_pending(d.disp)
+	if s := d.seat; s != nil {
+		for _, offer := range s.offers {
+			if offer.readFD >= 0 {
+				pollfds = append(pollfds, syscall.PollFd{Fd: int32(offer.readFD), Events: syscall.POLLIN})
+			}
+		}
 	}
 	dispFd := &pollfds[0]
 	if ret, err := C.wl_display_flush(d.disp); ret < 0 {
@@ -1562,8 +1688,49 @@ func (d *wlDisplay) dispatch() error {
 			return fmt.Errorf("wayland: read from notify pipe failed: %v", err)
 		}
 	}
+	if d.seat != nil {
+		d.seat.readDrops()
+	}
 	d.repeat.Repeat(d)
 	return nil
+}
+
+func (s *wlSeat) readDrops() {
+	var buf [32 * 1024]byte
+	for id, offer := range s.offers {
+		if offer.readFD < 0 {
+			continue
+		}
+		n, err := syscall.Read(offer.readFD, buf[:])
+		if err == syscall.EAGAIN || err == syscall.EINTR {
+			continue
+		}
+		if n > 0 {
+			offer.data = append(offer.data, buf[:n]...)
+			continue
+		}
+		syscall.Close(offer.readFD)
+		if err == nil {
+			C.wl_data_offer_finish(id)
+		}
+		if w := offer.window; w != nil && w.fileDrag == offer {
+			if err != nil {
+				w.cancelFileDrag()
+			} else {
+				w.fileDrag = nil
+				data := offer.data
+				w.ProcessEvent(transfer.DataEvent{
+					Type: "text/uri-list",
+					Open: func() io.ReadCloser {
+						return io.NopCloser(bytes.NewReader(data))
+					},
+				})
+			}
+		}
+		delete(s.offers, id)
+		callbackDelete(unsafe.Pointer(id))
+		C.wl_data_offer_destroy(id)
+	}
 }
 
 func (w *window) SetAnimating(anim bool) {
@@ -2026,7 +2193,19 @@ func (w *window) surface() (*C.struct_wl_surface, int, int) {
 	return w.surf, sz.X, sz.Y
 }
 
-func (w *window) SetFileDropEnabled(enabled bool) {}
+func (w *window) SetFileDropEnabled(enabled bool) {
+	w.fileDropEnabled = enabled
+	if !enabled {
+		w.cancelFileDrag()
+	}
+}
+
+func (w *window) cancelFileDrag() {
+	if w.fileDrag != nil {
+		w.fileDrag = nil
+		w.ProcessEvent(transfer.CancelEvent{})
+	}
+}
 
 func (w *window) ShowTextInput(show bool) {
 	w.textInput = show
