@@ -80,19 +80,51 @@ static void handleMouse(GioView *view, NSEvent *event, int typ, CGFloat dx, CGFl
 
 @implementation GioView
 - (NSDragOperation)draggingEntered:(id<NSDraggingInfo>)sender {
+	return [self draggingUpdated:sender];
+}
+
+- (NSDragOperation)draggingUpdated:(id<NSDraggingInfo>)sender {
+	if (self.window == nil) {
+		return NSDragOperationNone;
+	}
 	NSPasteboard *pboard = [sender draggingPasteboard];
-	if ([pboard.types containsObject:NSPasteboardTypeFileURL] ||
-	    [pboard.types containsObject:NSFilenamesPboardType]) {
+	BOOL hasFiles = [pboard.types containsObject:NSPasteboardTypeFileURL] ||
+		[pboard.types containsObject:NSFilenamesPboardType];
+	NSPoint point = [self convertPoint:sender.draggingLocation fromView:nil];
+	BOOL accept = gio_onFileDrag(self.handle, point.x, self.bounds.size.height - point.y, hasFiles);
+	if (accept && (sender.draggingSourceOperationMask & NSDragOperationCopy)) {
 		return NSDragOperationCopy;
 	}
 	return NSDragOperationNone;
 }
 
+- (void)draggingExited:(id<NSDraggingInfo>)sender {
+	if (self.window != nil) {
+		gio_onFileDrag(self.handle, 0, 0, false);
+	}
+}
+
+- (void)draggingEnded:(id<NSDraggingInfo>)sender {
+	[self draggingExited:sender];
+}
+
 - (BOOL)prepareForDragOperation:(id<NSDraggingInfo>)sender {
-	return [self draggingEntered:sender] != NSDragOperationNone;
+	if (self.window == nil || !(sender.draggingSourceOperationMask & NSDragOperationCopy)) {
+		return NO;
+	}
+	NSPasteboard *pboard = [sender draggingPasteboard];
+	if (![pboard.types containsObject:NSPasteboardTypeFileURL] &&
+		![pboard.types containsObject:NSFilenamesPboardType]) {
+		return NO;
+	}
+	NSPoint point = [self convertPoint:sender.draggingLocation fromView:nil];
+	return gio_acceptsFileDrop(self.handle, point.x, self.bounds.size.height - point.y);
 }
 
 - (BOOL)performDragOperation:(id<NSDraggingInfo>)sender {
+	if (![self prepareForDragOperation:sender]) {
+		return NO;
+	}
 	NSPasteboard *pboard = [sender draggingPasteboard];
 	NSArray<NSURL *> *urls = [pboard readObjectsForClasses:@[[NSURL class]]
 		options:@{NSPasteboardURLReadingFileURLsOnlyKey: @YES}];
@@ -110,13 +142,12 @@ static void handleMouse(GioView *view, NSEvent *event, int typ, CGFloat dx, CGFl
 			}
 		}
 	}
-	if (paths.count == 0) {
+	if (paths.count == 0 || self.window == nil) {
 		return NO;
 	}
 	NSPoint point = [self convertPoint:sender.draggingLocation fromView:nil];
-	gio_onFileDrop(self.handle, (__bridge CFTypeRef)paths, paths.count,
+	return gio_onFileDrop(self.handle, (__bridge CFTypeRef)paths, paths.count,
 		point.x, self.bounds.size.height - point.y);
-	return YES;
 }
 
 - (void)setFrameSize:(NSSize)newSize {

@@ -387,11 +387,12 @@ type window struct {
 	displayLink *displayLink
 	// redraw is a single entry channel for making sure only one
 	// display link redraw request is in flight.
-	redraw      chan struct{}
-	cursor      pointer.Cursor
-	pointerBtns pointer.Buttons
-	loop        *eventLoop
-	lastMods    C.NSUInteger
+	redraw          chan struct{}
+	cursor          pointer.Cursor
+	pointerBtns     pointer.Buttons
+	fileDropEnabled bool
+	loop            *eventLoop
+	lastMods        C.NSUInteger
 
 	scale  float32
 	config Config
@@ -587,7 +588,11 @@ func (w *window) EditorStateChanged(old, new editorState) {
 }
 
 func (w *window) SetFileDropEnabled(enabled bool) {
+	w.fileDropEnabled = enabled
 	C.setFileDrop(w.view, C.bool(enabled))
+	if !enabled {
+		w.w.ProcessEvent(transfer.CancelEvent{})
+	}
 }
 
 func (w *window) ShowTextInput(show bool) {}
@@ -764,19 +769,50 @@ func gio_onMouse(h C.uintptr_t, evt C.CFTypeRef, cdir C.int, cbtn C.NSInteger, x
 	})
 }
 
-//export gio_onFileDrop
-func gio_onFileDrop(h C.uintptr_t, paths C.CFTypeRef, count C.NSUInteger, x, y C.CGFloat) {
+//export gio_onFileDrag
+func gio_onFileDrag(h C.uintptr_t, x, y C.CGFloat, hasFiles C.bool) C.bool {
 	w := windowFor(h)
+	pos := f32.Point{X: float32(x) * w.scale, Y: float32(y) * w.scale}
+	if bool(hasFiles) && w.fileDropEnabled {
+		w.ProcessEvent(transfer.InitiateEvent{Types: []string{"text/uri-list"}})
+		w.ProcessEvent(pointer.Event{Kind: pointer.Drag, Source: pointer.Mouse, Position: pos})
+	} else {
+		w.ProcessEvent(transfer.CancelEvent{})
+	}
+	// Redraw drop targets during AppKit's drag tracking loop.
+	if w.anim && w.view != 0 {
+		w.draw()
+	}
+	return C.bool(bool(hasFiles) && w.view != 0 && w.fileDropEnabled &&
+		w.w.AcceptsTransferAt("text/uri-list", pos))
+}
+
+//export gio_acceptsFileDrop
+func gio_acceptsFileDrop(h C.uintptr_t, x, y C.CGFloat) C.bool {
+	w := windowFor(h)
+	pos := f32.Point{X: float32(x) * w.scale, Y: float32(y) * w.scale}
+	return C.bool(w.view != 0 && w.fileDropEnabled && w.w.AcceptsTransferAt("text/uri-list", pos))
+}
+
+//export gio_onFileDrop
+func gio_onFileDrop(h C.uintptr_t, paths C.CFTypeRef, count C.NSUInteger, x, y C.CGFloat) C.bool {
+	w := windowFor(h)
+	pos := f32.Point{X: float32(x) * w.scale, Y: float32(y) * w.scale}
+	if !w.fileDropEnabled || !w.w.AcceptsTransferAt("text/uri-list", pos) {
+		return false
+	}
 	files := make([]string, 0, int(count))
 	for i := range int(count) {
 		if path := nsstringToString(C.fileDropPath(paths, C.NSUInteger(i))); path != "" {
 			files = append(files, path)
 		}
 	}
-	if len(files) > 0 {
-		pos := f32.Point{X: float32(x) * w.scale, Y: float32(y) * w.scale}
-		w.ProcessEvent(fileDropEvent(pos, files))
+	if len(files) == 0 {
+		return false
 	}
+	w.ProcessEvent(pointer.Event{Kind: pointer.Drag, Source: pointer.Mouse, Position: pos})
+	w.ProcessEvent(fileDropEvent(files))
+	return true
 }
 
 //export gio_onDraw
