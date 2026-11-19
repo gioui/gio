@@ -1008,7 +1008,7 @@ func (w *window) Configure(options []Option) {
 				Right:  width,
 				Bottom: height,
 			}
-			windows.AdjustWindowRectEx(&r, uint32(style), 0, dwExStyle)
+			windows.AdjustWindowRectExForDpi(&r, uint32(style), 0, dwExStyle, dpi)
 			width = r.Right - r.Left
 			height = r.Bottom - r.Top
 		} else {

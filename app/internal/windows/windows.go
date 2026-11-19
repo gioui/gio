@@ -451,7 +451,7 @@ var (
 	_GlobalUnlock     = kernel32.NewProc("GlobalUnlock")
 
 	user32                        = syscall.NewLazySystemDLL("user32.dll")
-	_AdjustWindowRectEx           = user32.NewProc("AdjustWindowRectEx")
+	_AdjustWindowRectExForDpi     = user32.NewProc("AdjustWindowRectExForDpi")
 	_CallMsgFilter                = user32.NewProc("CallMsgFilterW")
 	_CloseClipboard               = user32.NewProc("CloseClipboard")
 	_CreateWindowEx               = user32.NewProc("CreateWindowExW")
@@ -534,8 +534,8 @@ var (
 	_DragFinish      = shell32.NewProc("DragFinish")
 )
 
-func AdjustWindowRectEx(r *Rect, dwStyle uint32, bMenu int, dwExStyle uint32) {
-	_AdjustWindowRectEx.Call(uintptr(unsafe.Pointer(r)), uintptr(dwStyle), uintptr(bMenu), uintptr(dwExStyle))
+func AdjustWindowRectExForDpi(r *Rect, dwStyle uint32, bMenu int, dwExStyle uint32, dpi int) {
+	_AdjustWindowRectExForDpi.Call(uintptr(unsafe.Pointer(r)), uintptr(dwStyle), uintptr(bMenu), uintptr(dwExStyle), uintptr(dpi))
 }
 
 // DragAcceptFiles enables or disables file drops for a window.
