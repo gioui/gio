@@ -3,19 +3,23 @@
 package app
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
-	"gioui.org/io/transfer"
 	syscall "golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 	"image"
 	"io"
 	"math"
+	"net/url"
 	"os"
+	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode"
 	"unicode/utf16"
@@ -32,6 +36,7 @@ import (
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
+	"gioui.org/io/transfer"
 )
 
 type Win32ViewEvent struct {
@@ -39,9 +44,13 @@ type Win32ViewEvent struct {
 }
 
 type window struct {
-	hwnd syscall.Handle
-	hdc  syscall.Handle
-	w    *callbacks
+	hwnd       syscall.Handle
+	hdc        syscall.Handle
+	w          *callbacks
+	dropTarget *dropTarget
+	dropTypes  []string
+	dragTypes  []string
+	dragData   map[string][]byte
 
 	// cursorIn tracks whether the cursor was inside the window according
 	// to the most recent WM_SETCURSOR.
@@ -68,7 +77,10 @@ type window struct {
 	loop      *eventLoop
 }
 
-const _WM_WAKEUP = windows.WM_USER + iota
+const (
+	_WM_WAKEUP = windows.WM_USER + iota
+	_WM_STARTDRAG
+)
 
 // UTF-16 surrogate ranges, from unicode/utf16.
 const (
@@ -127,6 +139,10 @@ func newWindow(win *callbacks, options []Option) {
 		}
 		w.loop = newEventLoop(w.w, w.wakeup)
 		w.w.SetDriver(w)
+		// Without OLE, file drops are unavailable but the window works.
+		if windows.OleInitialize() == nil {
+			defer windows.OleUninitialize()
+		}
 		err := w.init()
 		done <- struct{}{}
 		if err != nil {
@@ -379,6 +395,7 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 	case windows.WM_POINTERHWHEEL:
 		w.scrollEvent(wParam, lParam, true, getModifiers())
 	case windows.WM_DESTROY:
+		w.SetDropTypes(nil)
 		w.ProcessEvent(Win32ViewEvent{})
 		w.ProcessEvent(DestroyEvent{})
 		w.w = nil
@@ -415,20 +432,6 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 			return 0
 		}
 		szp.Rgrc[0] = mi.WorkArea
-		return 0
-	case windows.WM_DROPFILES:
-		hDrop := syscall.Handle(wParam)
-		defer windows.DragFinish(hDrop)
-		point, client := windows.DragQueryPoint(hDrop)
-		if !client {
-			return 0
-		}
-		if paths := dragQueryFiles(hDrop); len(paths) > 0 {
-			pos := f32.Pt(float32(point.X), float32(point.Y))
-			w.ProcessEvent(transfer.InitiateEvent{Types: []string{fileDropType}})
-			w.ProcessEvent(pointer.Event{Kind: pointer.Drag, Source: pointer.Mouse, Position: pos})
-			w.ProcessEvent(fileDropEvent(paths))
-		}
 		return 0
 	case windows.WM_PAINT:
 		w.draw(true)
@@ -468,6 +471,17 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 	case _WM_WAKEUP:
 		w.loop.Wakeup()
 		w.loop.FlushEvents()
+	case _WM_STARTDRAG:
+		data := w.dragData
+		w.dragData = nil
+		if data != nil {
+			if windows.GetKeyState(1) < 0 {
+				w.runDrag(data)
+			}
+			if w.w != nil {
+				w.w.DragEnded()
+			}
+		}
 	case windows.WM_TIMER:
 		if wParam == clipboardTimer {
 			windows.KillTimer(w.hwnd, clipboardTimer)
@@ -586,6 +600,396 @@ func dragQueryFiles(hDrop syscall.Handle) []string {
 		}
 	}
 	return paths
+}
+
+func (w *window) SetDropTypes(types []string) {
+	w.dropTypes = types
+	enabled := len(types) != 0
+	if enabled == (w.dropTarget != nil) {
+		return
+	}
+	if !enabled {
+		windows.RevokeDragDrop(w.hwnd)
+		w.dropTarget.release()
+		w.dropTarget = nil
+		w.w.ProcessEvent(transfer.CancelEvent{})
+		return
+	}
+	dropTargetOnce.Do(initDropTarget)
+	helper := windows.NewDropTargetHelper()
+	ptr, err := syscall.LocalAlloc(syscall.LPTR, uint32(unsafe.Sizeof(dropTarget{})))
+	if err != nil {
+		if helper != nil {
+			helper.Release()
+		}
+		return
+	}
+	t := (*dropTarget)(unsafe.Pointer(ptr))
+	*t = dropTarget{vtbl: &dropTargetVtbl, hwnd: w.hwnd, refs: 1, helper: helper}
+	if err := windows.RegisterDragDrop(w.hwnd, unsafe.Pointer(t)); err != nil {
+		t.release()
+		return
+	}
+	w.dropTarget = t
+}
+
+func (w *window) dropTypeAt(pos f32.Point) string {
+	for _, mime := range w.dragTypes {
+		if w.w.AcceptsTransferAt(mime, pos) {
+			return mime
+		}
+	}
+	return ""
+}
+
+func dragFormats(mime string) []windows.FormatEtc {
+	if mime == "" {
+		return nil
+	}
+	var formats []windows.FormatEtc
+	if mime == fileDropType {
+		formats = append(formats, fileDropFormat)
+	}
+	format := fileDropFormat
+	if mime == "text/plain" || strings.EqualFold(mime, "text/plain;charset=utf-8") {
+		format.Format = windows.CF_UNICODETEXT
+		formats = append(formats, format)
+	}
+	if id, err := windows.RegisterClipboardFormat("Gio MIME: " + mime); err == nil {
+		format.Format = uint16(id)
+		formats = append(formats, format)
+	}
+	return formats
+}
+
+func readDragData(obj *windows.DataObject, format windows.FormatEtc, mime string, pos f32.Point) (transfer.DataEvent, bool) {
+	medium, err := obj.GetData(&format)
+	if err != nil {
+		return transfer.DataEvent{}, false
+	}
+	defer windows.ReleaseStgMedium(&medium)
+	if medium.Tymed != windows.TYMED_HGLOBAL || medium.Handle == 0 {
+		return transfer.DataEvent{}, false
+	}
+	if format.Format == windows.CF_HDROP {
+		paths := dragQueryFiles(medium.Handle)
+		if len(paths) != 0 {
+			return fileDropEvent(pos, paths), true
+		}
+		return transfer.DataEvent{}, false
+	}
+	size := windows.GlobalSize(medium.Handle)
+	if size > uintptr(^uint(0)>>1) {
+		return transfer.DataEvent{}, false
+	}
+	mem, err := windows.GlobalLock(medium.Handle)
+	if err != nil {
+		return transfer.DataEvent{}, false
+	}
+	defer windows.GlobalUnlock(medium.Handle)
+	if format.Format == windows.CF_UNICODETEXT {
+		text := unsafe.Slice((*uint16)(mem), int(size/2))
+		if end := slices.Index(text, 0); end >= 0 {
+			text = text[:end]
+		}
+		return platformDrop(pos, mime, []byte(string(utf16.Decode(text)))), true
+	}
+	buf := unsafe.Slice((*byte)(mem), int(size))
+	if len(buf) < 8 {
+		return transfer.DataEvent{}, false
+	}
+	count := binary.LittleEndian.Uint64(buf)
+	if count > uint64(len(buf)-8) {
+		return transfer.DataEvent{}, false
+	}
+	return platformDrop(pos, mime, slices.Clone(buf[8:8+count])), true
+}
+
+func (w *window) StartDrag(data map[string][]byte) {
+	w.dragData = data
+	if windows.PostMessage(w.hwnd, _WM_STARTDRAG, 0, 0) != nil {
+		w.dragData = nil
+		w.w.DragEnded()
+	}
+}
+
+func (w *window) runDrag(data map[string][]byte) {
+	obj, err := windows.NewDragData()
+	if err != nil {
+		return
+	}
+	defer obj.Release()
+	if populateDragData(obj, data) {
+		if _, files := data[fileDropType]; files {
+			obj.ShellDoDragDrop(w.hwnd)
+		} else {
+			obj.DoDragDrop()
+		}
+	}
+}
+
+func populateDragData(obj *windows.DataObject, data map[string][]byte) bool {
+	added := false
+	for mime, raw := range data {
+		for _, format := range dragFormats(mime) {
+			var payload []byte
+			switch format.Format {
+			case windows.CF_HDROP:
+				paths := dragFilePaths(raw)
+				if len(paths) == 0 {
+					continue
+				}
+				payload = make([]byte, 20)
+				payload[0] = 20
+				payload[16] = 1
+				payload = appendWide(payload, strings.Join(paths, "\x00")+"\x00")
+			case windows.CF_UNICODETEXT:
+				payload = appendWide(nil, string(raw))
+			default:
+				payload = binary.LittleEndian.AppendUint64(nil, uint64(len(raw)))
+				payload = append(payload, raw...)
+			}
+			handle, err := windows.GlobalAlloc(len(payload))
+			if err != nil {
+				continue
+			}
+			mem, err := windows.GlobalLock(handle)
+			if err != nil {
+				windows.GlobalFree(handle)
+				continue
+			}
+			copy(unsafe.Slice((*byte)(mem), len(payload)), payload)
+			windows.GlobalUnlock(handle)
+			medium := windows.StgMedium{Tymed: windows.TYMED_HGLOBAL, Handle: handle}
+			if obj.SetData(&format, &medium) {
+				added = true
+			} else {
+				windows.GlobalFree(handle)
+			}
+		}
+	}
+	return added
+}
+
+func appendWide(buf []byte, text string) []byte {
+	for _, unit := range utf16.Encode([]rune(text)) {
+		buf = binary.LittleEndian.AppendUint16(buf, unit)
+	}
+	return append(buf, 0, 0)
+}
+
+func dragFilePaths(data []byte) []string {
+	var paths []string
+	for line := range strings.SplitSeq(string(data), "\n") {
+		line = strings.TrimSuffix(line, "\r")
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		uri, err := url.Parse(line)
+		if err != nil || uri.Scheme != "file" || strings.ContainsRune(uri.Path, 0) {
+			return nil
+		}
+		path := uri.Path
+		if uri.Host != "" && !strings.EqualFold(uri.Host, "localhost") {
+			path = "//" + uri.Host + path
+		} else if len(path) >= 3 && path[0] == '/' && path[2] == ':' {
+			path = path[1:]
+		}
+		path = filepath.FromSlash(path)
+		if !filepath.IsAbs(path) {
+			return nil
+		}
+		paths = append(paths, path)
+	}
+	return paths
+}
+
+// dropTarget implements IDropTarget. OLE holds references to it, so it
+// is allocated outside the Go heap.
+type dropTarget struct {
+	vtbl   *[7]uintptr
+	hwnd   syscall.Handle
+	refs   int32
+	helper *windows.DropTargetHelper
+}
+
+var (
+	dropTargetOnce sync.Once
+	dropTargetVtbl [7]uintptr
+	fileDropFormat = windows.FormatEtc{
+		Format: windows.CF_HDROP,
+		Aspect: windows.DVASPECT_CONTENT,
+		Index:  -1,
+		Tymed:  windows.TYMED_HGLOBAL,
+	}
+)
+
+func initDropTarget() {
+	queryInterface := func(t *dropTarget, iid *syscall.GUID, out **dropTarget) uintptr {
+		if out == nil {
+			return uintptr(syscall.E_POINTER)
+		}
+		if *iid != windows.IID_IUnknown && *iid != windows.IID_IDropTarget {
+			*out = nil
+			return uintptr(syscall.E_NOINTERFACE)
+		}
+		*out = t
+		t.addRef()
+		return 0
+	}
+	// POINTL is passed by value: in one register on 64-bit Windows and as
+	// two arguments on 32-bit Windows.
+	var dragEnter, dragOver, drop uintptr
+	if unsafe.Sizeof(uintptr(0)) == 8 {
+		pt := func(p uintptr) windows.Point {
+			return windows.Point{X: int32(p), Y: int32(uint64(p) >> 32)}
+		}
+		dragEnter = syscall.NewCallback(func(t *dropTarget, data *windows.DataObject, keys, p uintptr, effect *uint32) uintptr {
+			return t.dragEnter(data, pt(p), effect)
+		})
+		dragOver = syscall.NewCallback(func(t *dropTarget, keys, p uintptr, effect *uint32) uintptr {
+			return t.dragOver(pt(p), effect)
+		})
+		drop = syscall.NewCallback(func(t *dropTarget, data *windows.DataObject, keys, p uintptr, effect *uint32) uintptr {
+			return t.drop(data, pt(p), effect)
+		})
+	} else {
+		dragEnter = syscall.NewCallback(func(t *dropTarget, data *windows.DataObject, keys, x, y uintptr, effect *uint32) uintptr {
+			return t.dragEnter(data, windows.Point{X: int32(x), Y: int32(y)}, effect)
+		})
+		dragOver = syscall.NewCallback(func(t *dropTarget, keys, x, y uintptr, effect *uint32) uintptr {
+			return t.dragOver(windows.Point{X: int32(x), Y: int32(y)}, effect)
+		})
+		drop = syscall.NewCallback(func(t *dropTarget, data *windows.DataObject, keys, x, y uintptr, effect *uint32) uintptr {
+			return t.drop(data, windows.Point{X: int32(x), Y: int32(y)}, effect)
+		})
+	}
+	dropTargetVtbl = [7]uintptr{
+		syscall.NewCallback(queryInterface),
+		syscall.NewCallback((*dropTarget).addRef),
+		syscall.NewCallback((*dropTarget).release),
+		dragEnter,
+		dragOver,
+		syscall.NewCallback((*dropTarget).dragLeave),
+		drop,
+	}
+}
+
+func (t *dropTarget) addRef() uintptr {
+	return uintptr(atomic.AddInt32(&t.refs, 1))
+}
+
+func (t *dropTarget) release() uintptr {
+	refs := atomic.AddInt32(&t.refs, -1)
+	if refs == 0 {
+		if t.helper != nil {
+			t.helper.Release()
+		}
+		syscall.LocalFree(syscall.Handle(uintptr(unsafe.Pointer(t))))
+	}
+	return uintptr(refs)
+}
+
+// window returns the window t is registered for, or nil if t was revoked.
+func (t *dropTarget) window() *window {
+	if w, ok := winMap.Load(t.hwnd); ok && w.(*window).dropTarget == t {
+		return w.(*window)
+	}
+	return nil
+}
+
+func (t *dropTarget) dragEnter(data *windows.DataObject, pt windows.Point, effect *uint32) uintptr {
+	if w := t.window(); w != nil {
+		w.dragTypes = nil
+		for _, mime := range w.dropTypes {
+			for _, format := range dragFormats(mime) {
+				if data.QueryGetData(&format) {
+					w.dragTypes = append(w.dragTypes, mime)
+					break
+				}
+			}
+		}
+		w.platformDragEvent(transfer.InitiateEvent{Types: w.dragTypes})
+	}
+	t.updateDrag(pt, effect)
+	if t.helper != nil {
+		t.helper.DragEnter(t.hwnd, data, &pt, *effect)
+	}
+	return 0
+}
+
+func (t *dropTarget) dragOver(pt windows.Point, effect *uint32) uintptr {
+	t.updateDrag(pt, effect)
+	if t.helper != nil {
+		t.helper.DragOver(&pt, *effect)
+	}
+	return 0
+}
+
+func (t *dropTarget) updateDrag(pt windows.Point, effect *uint32) {
+	allowed := *effect
+	*effect = 0
+	w := t.window()
+	if w == nil || len(w.dragTypes) == 0 {
+		return
+	}
+	clientPoint := pt
+	windows.ScreenToClient(w.hwnd, &clientPoint)
+	pos := f32.Pt(float32(clientPoint.X), float32(clientPoint.Y))
+	w.platformDragEvent(pointer.Event{Kind: pointer.Drag, Source: pointer.Mouse, Position: pos})
+	if allowed&windows.DROPEFFECT_COPY != 0 && w.dropTypeAt(pos) != "" {
+		*effect = windows.DROPEFFECT_COPY
+	}
+}
+
+func (t *dropTarget) dragLeave() uintptr {
+	if t.helper != nil {
+		t.helper.DragLeave()
+	}
+	t.endDrag()
+	return 0
+}
+
+func (t *dropTarget) endDrag() {
+	if w := t.window(); w != nil {
+		w.dragTypes = nil
+		w.platformDragEvent(transfer.CancelEvent{})
+	}
+}
+
+// drop delivers the dropped files. OLE doesn't call DragLeave after Drop,
+// so drop ends the drag itself.
+func (t *dropTarget) drop(data *windows.DataObject, pt windows.Point, effect *uint32) uintptr {
+	t.updateDrag(pt, effect)
+	w := t.window()
+	allowed := *effect
+	*effect = 0
+	if allowed != 0 && w != nil {
+		clientPoint := pt
+		windows.ScreenToClient(w.hwnd, &clientPoint)
+		pos := f32.Pt(float32(clientPoint.X), float32(clientPoint.Y))
+		mime := w.dropTypeAt(pos)
+		for _, format := range dragFormats(mime) {
+			if evt, ok := readDragData(data, format, mime, pos); ok {
+				w.platformDragEvent(evt)
+				*effect = windows.DROPEFFECT_COPY
+				break
+			}
+		}
+	}
+	if t.helper != nil {
+		t.helper.Drop(data, &pt, *effect)
+	}
+	t.endDrag()
+	return 0
+}
+
+func (w *window) platformDragEvent(e event.Event) {
+	w.ProcessEvent(e)
+	// OLE runs its own message loop during the drag, so draw here.
+	if w.animating && w.hwnd != 0 {
+		w.draw(false)
+	}
 }
 
 // getModifiers reports the currently pressed modifier keys.
@@ -1165,10 +1569,6 @@ func loadCursor(cursor pointer.Cursor) (syscall.Handle, error) {
 	default:
 		return windows.LoadCursor(windowsCursor[cursor])
 	}
-}
-
-func (w *window) SetFileDropEnabled(enabled bool) {
-	windows.DragAcceptFiles(w.hwnd, enabled)
 }
 
 func (w *window) ShowTextInput(show bool) {
