@@ -10,7 +10,9 @@
 // When a user initiates a pointer-guided drag and drop transfer, the
 // potential targets receive an InitiateEvent.
 // Potential targets are targets with at least one MIME type in common
-// with the source. When a drag gesture completes, a CancelEvent is sent
+// with the source. Targets can use [gioui.org/io/pointer.Filter] to track
+// the pointer entering, moving within, or leaving their area.
+// When a drag gesture completes, a CancelEvent is sent
 // to the source and all potential targets.
 //
 // The RequestEvent is sent to the source upon drop.
@@ -19,9 +21,7 @@
 // [DataEvent.Open] returns file URIs separated by CRLF, not file contents.
 // The platform supplies the data.
 //
-// File drops are currently supported on Windows and macOS. These implementations
-// report the drop after the files are released. Targets receive [InitiateEvent]
-// and [CancelEvent] at that point; the selected target also receives [DataEvent].
+// File drops are supported on Windows, macOS, and Wayland.
 package transfer
 
 import (
@@ -76,7 +76,10 @@ func (RequestEvent) ImplementsEvent() {}
 
 // InitiateEvent is sent to potential data targets when a drag-and-drop
 // transfer gesture is initiated.
-type InitiateEvent struct{}
+type InitiateEvent struct {
+	// Types lists the MIME types offered by the source.
+	Types []string
+}
 
 func (InitiateEvent) ImplementsEvent() {}
 

@@ -119,22 +119,6 @@ type SystemEvent struct {
 	Event event.Event
 }
 
-// DropEvent reports data dropped onto a window from another application.
-// Router sends [transfer.InitiateEvent] and [transfer.CancelEvent] to matching
-// targets. The target at Position also receives a [transfer.DataEvent].
-type DropEvent struct {
-	// Position is the drop location in window coordinates, in pixels.
-	Position f32.Point
-	// Type is the MIME type of the offered data.
-	Type string
-	// Open returns a new reader on each call so Router can replay the event.
-	// The data must remain available until the event is processed.
-	// Router closes unused readers. The target closes readers it opens.
-	Open func() io.ReadCloser
-}
-
-func (DropEvent) ImplementsEvent() {}
-
 // handler contains the per-handler state tracked by a [Router].
 type handler struct {
 	// active tracks whether the handler was active in the current
@@ -498,11 +482,25 @@ func (q *Router) processEvent(e event.Event, system bool) {
 		}
 		q.changeState(e, state, evts)
 	case transfer.DataEvent:
-		cstate, evts := q.cqueue.Push(state.clipboardState, e)
-		state.clipboardState = cstate
+		// Platform drops arrive after InitiateEvent and pointer.Drag. While
+		// that external gesture is active, route the data to its target.
+		if len(state.pointerState.external.types) == 0 {
+			cstate, evts := q.cqueue.Push(state.clipboardState, e)
+			state.clipboardState = cstate
+			q.changeState(e, state, evts)
+			break
+		}
+		pstate, evts := q.pointer.queue.drop(q.handlers, state.pointerState, e)
+		state.pointerState = pstate
 		q.changeState(e, state, evts)
-	case DropEvent:
-		evts := q.pointer.queue.drop(q.handlers, e)
+	case transfer.InitiateEvent:
+		e.Types = slices.Clone(e.Types)
+		pstate, evts := q.pointer.queue.initiate(q.handlers, state.pointerState, e)
+		state.pointerState = pstate
+		q.changeState(e, state, evts)
+	case transfer.CancelEvent:
+		pstate, evts := q.pointer.queue.cancel(q.handlers, state.pointerState)
+		state.pointerState = pstate
 		q.changeState(e, state, evts)
 	default:
 		panic("unknown event type")
@@ -593,7 +591,7 @@ func (q *Router) executeCommand(c Command) stateChange {
 }
 
 func (q *Router) changeState(e event.Event, state inputState, evts []taggedEvent) {
-	// Wrap pointer.DataEvent.Open functions to detect them not being called.
+	// Wrap transfer.DataEvent.Open functions to detect them not being called.
 	for i := range evts {
 		e := &evts[i]
 		if de, ok := e.event.(transfer.DataEvent); ok {
@@ -612,9 +610,15 @@ func (q *Router) changeState(e event.Event, state inputState, evts []taggedEvent
 	if len(q.changes) == 0 {
 		q.changes = append(q.changes, stateChange{})
 	}
-	if e != nil && len(evts) > 0 {
-		// An event triggered events bound for user receivers. Add a state change to be
-		// able to redo the change in case of a command execution.
+	record := len(evts) > 0
+	switch e := e.(type) {
+	case transfer.InitiateEvent, transfer.CancelEvent:
+		record = true
+	case pointer.Event:
+		record = record || (e.Kind == pointer.Drag && len(state.pointerState.external.types) > 0)
+	}
+	if e != nil && record {
+		// Keep the event so command execution can replay this state change.
 		q.changes = append(q.changes, stateChange{event: e, state: state, events: evts})
 	} else {
 		// Otherwise, merge with previous change.
@@ -744,6 +748,12 @@ func (q *Router) AcceptsTransfer(mime string) bool {
 		}
 	}
 	return false
+}
+
+// AcceptsTransferAt reports whether the target at position accepts mime.
+// Position is in window coordinates, in pixels.
+func (q *Router) AcceptsTransferAt(mime string, position f32.Point) bool {
+	return q.pointer.queue.transferTargetAt(q.handlers, []string{mime}, position) != nil
 }
 
 // TextInputState returns the input state from the most recent
