@@ -72,9 +72,10 @@ func (l Label) LayoutDetailed(gtx layout.Context, lt *text.Shaper, font font.Fon
 	m := op.Record(gtx.Ops)
 	viewport := image.Rectangle{Max: cs.Max}
 	it := textIterator{
-		viewport: viewport,
-		maxLines: l.MaxLines,
-		material: textMaterial,
+		viewport:     viewport,
+		maxLines:     l.MaxLines,
+		material:     textMaterial,
+		paintBitmaps: true,
 	}
 	semantic.LabelOp(txt).Add(gtx.Ops)
 	var glyphs [32]text.Glyph
@@ -108,6 +109,8 @@ type textIterator struct {
 	// the color of the glyphs is undefined and may change unpredictably if the
 	// text contains color glyphs.
 	material op.CallOp
+	// paintBitmaps controls whether color glyph bitmaps are emitted.
+	paintBitmaps bool
 	// truncated tracks the count of truncated runes in the text.
 	truncated int
 	// linesSeen tracks the quantity of line endings this iterator has seen.
@@ -216,8 +219,10 @@ func (it *textIterator) paintGlyph(gtx layout.Context, shaper *text.Shaper, glyp
 		it.material.Add(gtx.Ops)
 		paint.PaintOp{}.Add(gtx.Ops)
 		outline.Pop()
-		if call := shaper.Bitmaps(line); call != (op.CallOp{}) {
-			call.Add(gtx.Ops)
+		if it.paintBitmaps {
+			if call := shaper.Bitmaps(line); call != (op.CallOp{}) {
+				call.Add(gtx.Ops)
+			}
 		}
 		t.Pop()
 		line = line[:0]
