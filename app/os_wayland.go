@@ -1959,20 +1959,18 @@ func (w *window) updateOutputs() {
 		for _, w2 := range conf.windows {
 			if w2 == w {
 				found = true
-				if conf.scale > scale {
-					scale = conf.scale
-				}
+				scale = max(scale, conf.scale)
 			}
 		}
 	}
-	if found && scale != w.scale {
+	if !found {
+		return
+	}
+	if scale != w.scale {
 		w.scale = scale
 		C.wl_surface_set_buffer_scale(w.surf, C.int32_t(w.scale))
-		w.draw(true)
 	}
-	if found {
-		w.draw(true)
-	}
+	w.draw(true)
 }
 
 func (w *window) getConfig() (image.Point, unit.Metric) {
