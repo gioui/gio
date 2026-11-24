@@ -780,7 +780,9 @@ func gio_onFileDrop(h C.uintptr_t, paths C.CFTypeRef, count C.NSUInteger, x, y C
 	}
 	if len(files) > 0 {
 		pos := f32.Point{X: float32(x) * w.scale, Y: float32(y) * w.scale}
-		w.ProcessEvent(fileDropEvent(pos, files))
+		w.ProcessEvent(transfer.InitiateEvent{Types: []string{fileDropType}})
+		w.ProcessEvent(pointer.Event{Kind: pointer.Drag, Source: pointer.Mouse, Position: pos})
+		w.ProcessEvent(fileDropEvent(files))
 	}
 }
 

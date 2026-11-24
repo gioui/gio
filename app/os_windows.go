@@ -424,7 +424,10 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 			return 0
 		}
 		if paths := dragQueryFiles(hDrop); len(paths) > 0 {
-			w.ProcessEvent(fileDropEvent(f32.Pt(float32(point.X), float32(point.Y)), paths))
+			pos := f32.Pt(float32(point.X), float32(point.Y))
+			w.ProcessEvent(transfer.InitiateEvent{Types: []string{fileDropType}})
+			w.ProcessEvent(pointer.Event{Kind: pointer.Drag, Source: pointer.Mouse, Position: pos})
+			w.ProcessEvent(fileDropEvent(paths))
 		}
 		return 0
 	case windows.WM_PAINT:

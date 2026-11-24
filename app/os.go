@@ -197,8 +197,6 @@ type driver interface {
 	Configure([]Option)
 	// SetCursor updates the current cursor to name.
 	SetCursor(cursor pointer.Cursor)
-	// SetFileDropEnabled enables or disables file drops for the window.
-	SetFileDropEnabled(enabled bool)
 	// Perform actions on the window.
 	Perform(system.Action)
 	// EditorStateChanged notifies the driver that the editor state changed.
@@ -318,13 +316,6 @@ func (e *eventLoop) FlushEvents() {
 		evt, ok := e.win.nextEvent()
 		if !ok {
 			break
-		}
-		if _, ok := evt.(DestroyEvent); ok {
-			// Don't invalidate after destruction.
-			select {
-			case <-e.invalidates:
-			default:
-			}
 		}
 		e.deliverEvent(evt)
 	}

@@ -368,8 +368,6 @@ func (w *window) contextView() C.CFTypeRef {
 	return w.view
 }
 
-func (w *window) SetFileDropEnabled(enabled bool) {}
-
 func (w *window) ShowTextInput(show bool) {
 	if show {
 		C.showTextInput(w.view)

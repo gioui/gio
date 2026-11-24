@@ -948,6 +948,29 @@ func TestTransferFirstMoveOutsideSource(t *testing.T) {
 	assertEventSequence(t, events(&r, -1, sourceFilter), transfer.RequestEvent{Type: "file"})
 }
 
+func TestTransferInitiateMIMEIntersection(t *testing.T) {
+	var r Router
+	var ops op.Ops
+	var source, target int
+	for _, mime := range []string{"text/plain", "image/png"} {
+		r.Event(transfer.SourceFilter{Target: &source, Type: mime})
+	}
+	targetFilter := transfer.TargetFilter{Target: &target, Type: "image/png"}
+	r.Event(targetFilter)
+	sourceArea := clip.Rect(image.Rect(0, 0, 10, 10)).Push(&ops)
+	event.Op(&ops, &source)
+	sourceArea.Pop()
+	targetArea := clip.Rect(image.Rect(10, 0, 20, 10)).Push(&ops)
+	event.Op(&ops, &target)
+	targetArea.Pop()
+	r.Frame(&ops)
+	r.Queue(
+		pointer.Event{Kind: pointer.Press, Source: pointer.Mouse, Position: f32.Pt(5, 5)},
+		pointer.Event{Kind: pointer.Move, Source: pointer.Mouse, Position: f32.Pt(15, 5)},
+	)
+	assertEventSequence(t, events(&r, -1, targetFilter), transfer.InitiateEvent{Types: []string{"image/png"}})
+}
+
 func TestTransferSourceRemovedBeforeFirstMove(t *testing.T) {
 	var r Router
 	var ops op.Ops
@@ -1267,13 +1290,9 @@ func TestTransfer(t *testing.T) {
 		)
 		assertEventSequence(t, events(&r, -1, source), transfer.RequestEvent{Type: "file"})
 		assertEventSequence(t, events(&r, -1, target), transfer.InitiateEvent{Types: []string{"file"}})
-		r.Queue(DropEvent{
-			Position: f32.Pt(40, 10),
-			Type:     "file",
-			Open: func() io.ReadCloser {
-				return io.NopCloser(strings.NewReader("external"))
-			},
-		})
+		r.Queue(drop(f32.Pt(40, 10), "file", func() io.ReadCloser {
+			return io.NopCloser(strings.NewReader("external"))
+		})...)
 		assertEventSequence(t, events(&r, -1, source))
 		evs := events(&r, -1, target)
 		if len(evs) != 3 {
