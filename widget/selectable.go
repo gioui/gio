@@ -2,7 +2,6 @@ package widget
 
 import (
 	"image"
-	"io"
 	"math"
 	"strings"
 
@@ -345,7 +344,7 @@ func (e *Selectable) command(gtx layout.Context, k key.Event) {
 		case "C", "X":
 			e.scratch = e.text.SelectedText(e.scratch)
 			if text := string(e.scratch); text != "" {
-				gtx.Execute(clipboard.WriteCmd{Type: "application/text", Data: io.NopCloser(strings.NewReader(text))})
+				gtx.Execute(clipboard.WriteCmd{Contents: []clipboard.Content{{Type: "application/text", Data: []byte(text)}}})
 			}
 		// Select all
 		case "A":

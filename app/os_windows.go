@@ -5,11 +5,9 @@ package app
 import (
 	"errors"
 	"fmt"
-	"gioui.org/io/transfer"
 	syscall "golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 	"image"
-	"io"
 	"math"
 	"os"
 	"runtime"
@@ -56,7 +54,7 @@ type window struct {
 
 	// Clipboard work waiting for another program to close the clipboard.
 	clipboard struct {
-		read  bool
+		reads []string
 		write *clipboardContent
 		tries int
 	}
@@ -895,8 +893,12 @@ func (w *window) NewContext() (context, error) {
 	return nil, errors.New("NewContext: no available GPU drivers")
 }
 
-func (w *window) ReadClipboard() {
-	w.clipboard.read = true
+func (w *window) ReadClipboard(types []string) {
+	if !wantsClipboardText(types) {
+		w.ProcessEvent(clipboardEvent(types, nil))
+		return
+	}
+	w.clipboard.reads = append(w.clipboard.reads, types...)
 	w.flushClipboard()
 }
 
@@ -918,7 +920,7 @@ const clipboardTimer = 1
 // flushClipboard does the pending clipboard work. While another program has
 // the clipboard open, it retries with backoff for a few seconds.
 func (w *window) flushClipboard() {
-	if !w.clipboard.read && w.clipboard.write == nil {
+	if len(w.clipboard.reads) == 0 && w.clipboard.write == nil {
 		return
 	}
 	err := windows.OpenClipboard(w.hwnd)
@@ -931,27 +933,20 @@ func (w *window) flushClipboard() {
 	var content string
 	if err == nil {
 		if c := w.clipboard.write; c != nil {
-			w.writeClipboard(string(c.data), c.sensitive)
+			data, _ := c.text()
+			w.writeClipboard(string(data), c.sensitive)
 		}
-		if w.clipboard.read {
+		if len(w.clipboard.reads) > 0 {
 			content, _ = w.readClipboard()
 		}
 		windows.CloseClipboard()
 	}
 	w.clipboard.write = nil
-	if w.clipboard.read {
-		w.clipboard.read = false
-		w.processDataEvent(content)
+	reads := w.clipboard.reads
+	w.clipboard.reads = nil
+	if len(reads) > 0 {
+		w.ProcessEvent(clipboardTextEvent(reads, content))
 	}
-}
-
-func (w *window) processDataEvent(content string) {
-	w.ProcessEvent(transfer.DataEvent{
-		Type: "application/text",
-		Open: func() io.ReadCloser {
-			return io.NopCloser(strings.NewReader(content))
-		},
-	})
 }
 
 func (w *window) Configure(options []Option) {
@@ -1056,6 +1051,9 @@ func (w *window) Configure(options []Option) {
 }
 
 func (w *window) WriteClipboard(c clipboardContent) {
+	if _, ok := c.text(); !ok {
+		return
+	}
 	w.clipboard.write = &c
 	w.flushClipboard()
 }

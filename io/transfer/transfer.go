@@ -88,11 +88,12 @@ func (CancelEvent) ImplementsEvent() {}
 
 // DataEvent is sent to the target receiving the transfer.
 type DataEvent struct {
-	// Type is the MIME type of Data.
-	Type string
-	// Open returns the transfer data. It is only valid to call Open in the frame
-	// the DataEvent is received. The caller must close the return value after use.
-	Open func() io.ReadCloser
+	// Types lists the MIME types carried by this event.
+	Types []string
+	// Open returns the data for a listed type, or nil for an unlisted type.
+	// Each type may be opened once, in the frame the event is received.
+	// The caller must close each returned reader after use.
+	Open func(mime string) io.ReadCloser
 }
 
 func (DataEvent) ImplementsEvent() {}

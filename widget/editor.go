@@ -471,7 +471,9 @@ func (e *Editor) processKey(gtx layout.Context) (EditorEvent, bool) {
 		case transfer.DataEvent:
 			e.scrollCaret = true
 			e.scroller.Stop()
-			content, err := io.ReadAll(ke.Open())
+			reader := ke.Open("application/text")
+			content, err := io.ReadAll(reader)
+			reader.Close()
 			if err == nil {
 				if e.Insert(string(content)) != 0 {
 					return ChangeEvent{}, true
@@ -528,7 +530,7 @@ func (e *Editor) command(gtx layout.Context, k key.Event) (EditorEvent, bool) {
 		case "C", "X":
 			e.scratch = e.text.SelectedText(e.scratch)
 			if text := string(e.scratch); text != "" {
-				gtx.Execute(clipboard.WriteCmd{Type: "application/text", Data: io.NopCloser(strings.NewReader(text))})
+				gtx.Execute(clipboard.WriteCmd{Contents: []clipboard.Content{{Type: "application/text", Data: []byte(text)}}})
 				if k.Name == "X" && !e.ReadOnly {
 					if e.Delete(1) != 0 {
 						return ChangeEvent{}, true

@@ -580,7 +580,7 @@ func (q *Router) executeCommand(c Command) stateChange {
 	case clipboard.WriteCmd:
 		q.cqueue.ProcessWriteClipboard(req)
 	case clipboard.ReadCmd:
-		state.clipboardState = q.cqueue.ProcessReadClipboard(state.clipboardState, req.Tag)
+		state.clipboardState = q.cqueue.ProcessReadClipboard(state.clipboardState, req)
 	case pointer.GrabCmd:
 		state.pointerState, evts = q.pointer.queue.grab(state.pointerState, req)
 	case op.InvalidateCmd:
@@ -593,16 +593,24 @@ func (q *Router) executeCommand(c Command) stateChange {
 }
 
 func (q *Router) changeState(e event.Event, state inputState, evts []taggedEvent) {
-	// Wrap pointer.DataEvent.Open functions to detect them not being called.
+	// Close any transfer readers the receiver does not take this frame.
 	for i := range evts {
 		e := &evts[i]
 		if de, ok := e.event.(transfer.DataEvent); ok {
-			transferIdx := len(q.transfers)
-			data := de.Open()
-			q.transfers = append(q.transfers, data)
-			de.Open = func() io.ReadCloser {
-				q.transfers[transferIdx] = nil
-				return data
+			start := len(q.transfers)
+			types := de.Types
+			de.Types = slices.Clone(types)
+			for _, mime := range types {
+				q.transfers = append(q.transfers, de.Open(mime))
+			}
+			de.Open = func(mime string) io.ReadCloser {
+				index := slices.Index(types, mime)
+				if index < 0 {
+					return nil
+				}
+				reader := q.transfers[start+index]
+				q.transfers[start+index] = nil
+				return reader
 			}
 			e.event = de
 		}
@@ -761,14 +769,22 @@ func (q *Router) TextInputHint() (key.InputHint, bool) {
 	return q.key.queue.InputHint(q.handlers, q.state().keyState)
 }
 
-// WriteClipboard returns the most recent content to be copied
-// to the clipboard, if any.
+// WriteClipboard returns the first representation of a pending clipboard write.
 func (q *Router) WriteClipboard() (mime string, content []byte, ok bool) {
-	return q.cqueue.WriteClipboard()
+	contents, ok := q.WriteClipboardContents()
+	if !ok || len(contents) == 0 {
+		return "", nil, false
+	}
+	return contents[0].Type, contents[0].Data, true
 }
 
-// ClipboardSensitive reports whether the content most recently returned by
-// WriteClipboard is marked as sensitive, see [clipboard.WriteCmd].
+// WriteClipboardContents returns the pending clipboard representations, if any.
+func (q *Router) WriteClipboardContents() ([]clipboard.Content, bool) {
+	return q.cqueue.WriteContents()
+}
+
+// ClipboardSensitive reports whether the most recent clipboard write is marked
+// sensitive, see [clipboard.WriteCmd].
 func (q *Router) ClipboardSensitive() bool {
 	return q.cqueue.sensitive
 }
@@ -777,6 +793,19 @@ func (q *Router) ClipboardSensitive() bool {
 // to read the clipboard.
 func (q *Router) ClipboardRequested() bool {
 	return q.cqueue.ClipboardRequested(q.lastState().clipboardState)
+}
+
+// ClipboardTypes returns the MIME types requested by pending clipboard reads.
+func (q *Router) ClipboardTypes() []string {
+	var types []string
+	for _, req := range q.lastState().receivers {
+		for _, mime := range req.Types {
+			if !slices.Contains(types, mime) {
+				types = append(types, mime)
+			}
+		}
+	}
+	return types
 }
 
 // Cursor returns the last cursor set.

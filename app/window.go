@@ -266,15 +266,12 @@ func (w *Window) updateState() {
 	if hint, ok := q.TextInputHint(); ok {
 		w.driver.SetInputHint(hint)
 	}
-	if mime, txt, ok := q.WriteClipboard(); ok {
-		w.driver.WriteClipboard(clipboardContent{
-			mime:      mime,
-			data:      txt,
-			sensitive: q.ClipboardSensitive(),
-		})
+	if contents, ok := q.WriteClipboardContents(); ok {
+		content := clipboardContent{contents: contents, sensitive: q.ClipboardSensitive()}
+		w.driver.WriteClipboard(content)
 	}
 	if q.ClipboardRequested() {
-		w.driver.ReadClipboard()
+		w.driver.ReadClipboard(q.ClipboardTypes())
 	}
 	oldState := w.imeState
 	newState := oldState

@@ -7,10 +7,8 @@ package app
 import (
 	"errors"
 	"image"
-	"io"
 	"runtime"
 	"runtime/cgo"
-	"strings"
 	"time"
 	"unicode"
 	"unicode/utf8"
@@ -20,7 +18,6 @@ import (
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
-	"gioui.org/io/transfer"
 	"gioui.org/op"
 	"gioui.org/unit"
 
@@ -422,22 +419,26 @@ func (w *window) contextView() C.CFTypeRef {
 	return w.view
 }
 
-func (w *window) ReadClipboard() {
+func (w *window) ReadClipboard(types []string) {
+	if !wantsClipboardText(types) {
+		w.ProcessEvent(clipboardEvent(types, nil))
+		return
+	}
 	cstr := C.readClipboard()
+	var content string
 	if cstr != 0 {
 		defer C.CFRelease(cstr)
+		content = nsstringToString(cstr)
 	}
-	content := nsstringToString(cstr)
-	w.ProcessEvent(transfer.DataEvent{
-		Type: "application/text",
-		Open: func() io.ReadCloser {
-			return io.NopCloser(strings.NewReader(content))
-		},
-	})
+	w.ProcessEvent(clipboardTextEvent(types, content))
 }
 
 func (w *window) WriteClipboard(c clipboardContent) {
-	cstr := stringToNSString(string(c.data))
+	data, ok := c.text()
+	if !ok {
+		return
+	}
+	cstr := stringToNSString(string(data))
 	defer C.CFRelease(cstr)
 	var sens C.int
 	if c.sensitive {
