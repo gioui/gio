@@ -16,6 +16,7 @@ type WriteCmd struct {
 	// All platforms support "application/text" and "text/plain".
 	// Windows also supports "image/png", "text/html",
 	// "application/rtf", and "text/rtf". macOS supports "image/png" and "text/html".
+	// Wayland passes MIME types directly to the clipboard owner.
 	Contents []Content
 	// Sensitive marks the contents as a secret, such as a password. Where the
 	// platform has a convention for it, the clipboard content is marked so
