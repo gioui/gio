@@ -43,9 +43,17 @@ import (
 //go:generate wayland-scanner client-header /usr/share/wayland-protocols/unstable/xdg-decoration/xdg-decoration-unstable-v1.xml wayland_xdg_decoration.h
 //go:generate wayland-scanner private-code /usr/share/wayland-protocols/unstable/xdg-decoration/xdg-decoration-unstable-v1.xml wayland_xdg_decoration.c
 
+//go:generate wayland-scanner client-header /usr/share/wayland-protocols/staging/fractional-scale/fractional-scale-v1.xml wayland_fractional_scale.h
+//go:generate wayland-scanner private-code /usr/share/wayland-protocols/staging/fractional-scale/fractional-scale-v1.xml wayland_fractional_scale.c
+
+//go:generate wayland-scanner client-header /usr/share/wayland-protocols/stable/viewporter/viewporter.xml wayland_viewporter.h
+//go:generate wayland-scanner private-code /usr/share/wayland-protocols/stable/viewporter/viewporter.xml wayland_viewporter.c
+
 //go:generate sed -i "1s;^;//go:build ((linux \\&\\& !android) || freebsd) \\&\\& !nowayland\\n\\n;" wayland_xdg_shell.c
 //go:generate sed -i "1s;^;//go:build ((linux \\&\\& !android) || freebsd) \\&\\& !nowayland\\n\\n;" wayland_xdg_decoration.c
 //go:generate sed -i "1s;^;//go:build ((linux \\&\\& !android) || freebsd) \\&\\& !nowayland\\n\\n;" wayland_text_input.c
+//go:generate sed -i "1s;^;//go:build ((linux \\&\\& !android) || freebsd) \\&\\& !nowayland\\n\\n;" wayland_fractional_scale.c
+//go:generate sed -i "1s;^;//go:build ((linux \\&\\& !android) || freebsd) \\&\\& !nowayland\\n\\n;" wayland_viewporter.c
 
 /*
 #cgo linux pkg-config: wayland-client wayland-cursor
@@ -59,6 +67,8 @@ import (
 #include "wayland_text_input.h"
 #include "wayland_xdg_shell.h"
 #include "wayland_xdg_decoration.h"
+#include "wayland_fractional_scale.h"
+#include "wayland_viewporter.h"
 
 extern const struct wl_registry_listener gio_registry_listener;
 extern const struct wl_surface_listener gio_surface_listener;
@@ -68,6 +78,7 @@ extern const struct zxdg_toplevel_decoration_v1_listener gio_zxdg_toplevel_decor
 extern const struct xdg_wm_base_listener gio_xdg_wm_base_listener;
 extern const struct wl_callback_listener gio_callback_listener;
 extern const struct wl_output_listener gio_output_listener;
+extern const struct wp_fractional_scale_v1_listener gio_fractional_scale_listener;
 extern const struct wl_seat_listener gio_seat_listener;
 extern const struct wl_pointer_listener gio_pointer_listener;
 extern const struct wl_touch_listener gio_touch_listener;
@@ -90,6 +101,8 @@ type wlDisplay struct {
 	decor             *C.struct_zxdg_decoration_manager_v1
 	seat              *wlSeat
 	xkb               *xkb.Context
+	viewporter        *C.struct_wp_viewporter
+	fracScaleMgr      *C.struct_wp_fractional_scale_manager_v1
 	outputMap         map[C.uint32_t]*C.struct_wl_output
 	outputConfig      map[*C.struct_wl_output]*wlOutput
 
@@ -162,6 +175,8 @@ type window struct {
 	wmSurf     *C.struct_xdg_surface
 	topLvl     *C.struct_xdg_toplevel
 	decor      *C.struct_zxdg_toplevel_decoration_v1
+	viewport   *C.struct_wp_viewport
+	fracScale  *C.struct_wp_fractional_scale_v1
 	ppdp, ppsp float32
 	scroll     struct {
 		time  time.Duration
@@ -181,8 +196,14 @@ type window struct {
 		// such as border resizes and window moves. It
 		// is nil if the pointer is not in a system gesture
 		// area.
-		system  *C.struct_wl_cursor
-		surf    *C.struct_wl_surface
+		system   *C.struct_wl_cursor
+		surf     *C.struct_wl_surface
+		viewport *C.struct_wp_viewport
+		name     pointer.Cursor
+		// size is the theme size (XCURSOR_SIZE) and scale the buffer
+		// scale the theme is loaded for.
+		size    int
+		scale   int
 		cursors struct {
 			pointer         *C.struct_wl_cursor
 			resizeNorth     *C.struct_wl_cursor
@@ -210,7 +231,8 @@ type window struct {
 	animating bool
 	// The most recent configure serial waiting to be ack'ed.
 	serial C.uint32_t
-	scale  int
+	// scale is in units of 1/120; 120 means no scaling.
+	scale int
 	// size is the unscaled window size (unlike config.Size which is scaled).
 	size         image.Point
 	config       Config
@@ -352,17 +374,15 @@ func (d *wlDisplay) createNativeWindow(options []Option) (*window, error) {
 	if len(d.outputMap) == 0 {
 		return nil, errors.New("wayland: no outputs available")
 	}
-	var scale int
+	scale := 1
 	for _, conf := range d.outputConfig {
-		if s := conf.scale; s > scale {
-			scale = s
-		}
+		scale = max(scale, conf.scale)
 	}
 	ppdp := detectUIScale()
 
 	w := &window{
 		disp:      d,
-		scale:     scale,
+		scale:     scale * 120,
 		ppdp:      ppdp,
 		ppsp:      ppdp,
 		wakeups:   make(chan struct{}, 1),
@@ -377,8 +397,14 @@ func (d *wlDisplay) createNativeWindow(options []Option) (*window, error) {
 		w.destroy()
 		return nil, errors.New("wayland: wl_compositor_create_surface failed")
 	}
-	C.wl_surface_set_buffer_scale(w.surf, C.int32_t(w.scale))
 	callbackStore(unsafe.Pointer(w.surf), w)
+	if d.viewporter != nil && d.fracScaleMgr != nil {
+		w.viewport = C.wp_viewporter_get_viewport(d.viewporter, w.surf)
+		w.fracScale = C.wp_fractional_scale_manager_v1_get_fractional_scale(d.fracScaleMgr, w.surf)
+		C.wp_fractional_scale_v1_add_listener(w.fracScale, &C.gio_fractional_scale_listener, unsafe.Pointer(w.surf))
+	} else {
+		C.wl_surface_set_buffer_scale(w.surf, C.int32_t(w.bufferScale()))
+	}
 	w.wmSurf = C.xdg_wm_base_get_xdg_surface(d.wm, w.surf)
 	if w.wmSurf == nil {
 		w.destroy()
@@ -394,33 +420,23 @@ func (d *wlDisplay) createNativeWindow(options []Option) (*window, error) {
 	defer C.free(unsafe.Pointer(id))
 	C.xdg_toplevel_set_app_id(w.topLvl, id)
 
-	cursorTheme := C.CString(os.Getenv("XCURSOR_THEME"))
-	defer C.free(unsafe.Pointer(cursorTheme))
-	cursorSize := 32
+	w.cursor.size = 32
 	if envSize, ok := os.LookupEnv("XCURSOR_SIZE"); ok && envSize != "" {
 		size, err := strconv.Atoi(envSize)
 		if err == nil {
-			cursorSize = size
+			w.cursor.size = size
 		}
 	}
-
-	w.cursor.theme = C.wl_cursor_theme_load(cursorTheme, C.int(cursorSize*w.scale), d.shm)
-	if w.cursor.theme == nil {
+	if err := w.loadCursorTheme(); err != nil {
 		w.destroy()
-		return nil, errors.New("wayland: wl_cursor_theme_load failed")
+		return nil, err
 	}
-	w.loadCursors()
 	w.cursor.cursor = w.cursor.cursors.pointer
-	if w.cursor.cursor == nil {
-		w.destroy()
-		return nil, errors.New("wayland: wl_cursor_theme_get_cursor failed")
-	}
 	w.cursor.surf = C.wl_compositor_create_surface(d.compositor)
 	if w.cursor.surf == nil {
 		w.destroy()
 		return nil, errors.New("wayland: wl_compositor_create_surface failed")
 	}
-	C.wl_surface_set_buffer_scale(w.cursor.surf, C.int32_t(w.scale))
 	C.xdg_wm_base_add_listener(d.wm, &C.gio_xdg_wm_base_listener, unsafe.Pointer(w.surf))
 	C.wl_surface_add_listener(w.surf, &C.gio_surface_listener, unsafe.Pointer(w.surf))
 	C.xdg_surface_add_listener(w.wmSurf, &C.gio_xdg_surface_listener, unsafe.Pointer(w.surf))
@@ -432,6 +448,43 @@ func (d *wlDisplay) createNativeWindow(options []Option) (*window, error) {
 	}
 	w.updateOpaqueRegion()
 	return w, nil
+}
+
+// loadCursorTheme loads the cursor theme for the buffer scale of the
+// window, unless it is already loaded for that scale.
+func (w *window) loadCursorTheme() error {
+	scale := w.bufferScale()
+	if w.cursor.theme != nil && scale == w.cursor.scale {
+		return nil
+	}
+	name := C.CString(os.Getenv("XCURSOR_THEME"))
+	defer C.free(unsafe.Pointer(name))
+	theme := C.wl_cursor_theme_load(name, C.int(w.cursor.size*scale), w.disp.shm)
+	if theme == nil {
+		return errors.New("wayland: wl_cursor_theme_load failed")
+	}
+	oldTheme, oldCursors := w.cursor.theme, w.cursor.cursors
+	w.cursor.theme = theme
+	w.cursor.cursors.pointer = nil
+	w.loadCursors()
+	if w.cursor.cursors.pointer == nil {
+		w.cursor.theme, w.cursor.cursors = oldTheme, oldCursors
+		C.wl_cursor_theme_destroy(theme)
+		return errors.New("wayland: wl_cursor_theme_get_cursor failed")
+	}
+	w.cursor.scale = scale
+	if oldTheme == nil {
+		return nil
+	}
+	w.cursor.cursor = w.loadCursor(w.cursor.name)
+	if w.cursor.system != nil {
+		w.cursor.system, _ = w.systemGesture()
+	}
+	// Release the buffer of the old theme before destroying it.
+	C.wl_surface_attach(w.cursor.surf, nil, 0, 0)
+	C.wl_surface_commit(w.cursor.surf)
+	C.wl_cursor_theme_destroy(oldTheme)
+	return nil
 }
 
 func (w *window) loadCursors() {
@@ -700,6 +753,10 @@ func gio_onRegistryGlobal(data unsafe.Pointer, reg *C.struct_wl_registry, name C
 	switch C.GoString(cintf) {
 	case "wl_compositor":
 		d.compositor = (*C.struct_wl_compositor)(C.wl_registry_bind(reg, name, &C.wl_compositor_interface, 3))
+	case "wp_viewporter":
+		d.viewporter = (*C.struct_wp_viewporter)(C.wl_registry_bind(reg, name, &C.wp_viewporter_interface, 1))
+	case "wp_fractional_scale_manager_v1":
+		d.fracScaleMgr = (*C.struct_wp_fractional_scale_manager_v1)(C.wl_registry_bind(reg, name, &C.wp_fractional_scale_manager_v1_interface, 1))
 	case "wl_output":
 		output := (*C.struct_wl_output)(C.wl_registry_bind(reg, name, &C.wl_output_interface, 2))
 		C.wl_output_add_listener(output, &C.gio_output_listener, unsafe.Pointer(d.disp))
@@ -822,8 +879,8 @@ func gio_onTouchDown(data unsafe.Pointer, touch *C.struct_wl_touch, serial, t C.
 	w := callbackLoad(unsafe.Pointer(surf)).(*window)
 	s.touchFoci[id] = w
 	w.lastTouch = f32.Point{
-		X: fromFixed(x) * float32(w.scale),
-		Y: fromFixed(y) * float32(w.scale),
+		X: fromFixed(x) * w.pxScale(),
+		Y: fromFixed(y) * w.pxScale(),
 	}
 	w.ProcessEvent(pointer.Event{
 		Kind:      pointer.Press,
@@ -856,8 +913,8 @@ func gio_onTouchMotion(data unsafe.Pointer, touch *C.struct_wl_touch, t C.uint32
 	s := callbackLoad(data).(*wlSeat)
 	w := s.touchFoci[id]
 	w.lastTouch = f32.Point{
-		X: fromFixed(x) * float32(w.scale),
-		Y: fromFixed(y) * float32(w.scale),
+		X: fromFixed(x) * w.pxScale(),
+		Y: fromFixed(y) * w.pxScale(),
 	}
 	w.ProcessEvent(pointer.Event{
 		Kind:      pointer.Move,
@@ -1135,20 +1192,20 @@ func (w *window) Configure(options []Option) {
 		switch prev.Mode {
 		case Fullscreen:
 			w.config.Mode = Windowed
-			w.size = w.wsize.Div(w.scale)
+			w.size = w.toSurface(w.wsize)
 			C.xdg_toplevel_unset_fullscreen(w.topLvl)
 		case Minimized:
 			w.config.Mode = Windowed
 		case Maximized:
 			w.config.Mode = Windowed
-			w.size = w.wsize.Div(w.scale)
+			w.size = w.toSurface(w.wsize)
 			C.xdg_toplevel_unset_maximized(w.topLvl)
 		}
 		w.setTitle(prev, cnf)
 		if prev.Size != cnf.Size {
 			w.config.Size = cnf.Size
-			w.config.Size.Y += int(w.decoHeight()) * w.scale
-			w.size = w.config.Size.Div(w.scale)
+			w.config.Size.Y += w.toBuffer(image.Pt(0, w.decoHeight())).Y
+			w.size = w.toSurface(w.config.Size)
 		}
 		w.config.MinSize = cnf.MinSize
 		w.config.MaxSize = cnf.MaxSize
@@ -1159,10 +1216,10 @@ func (w *window) Configure(options []Option) {
 
 func (w *window) setWindowConstraints() {
 	decoHeight := w.decoHeight()
-	if scaled := w.config.MinSize.Div(w.scale); scaled != (image.Point{}) {
+	if scaled := w.toSurface(w.config.MinSize); scaled != (image.Point{}) {
 		C.xdg_toplevel_set_min_size(w.topLvl, C.int32_t(scaled.X), C.int32_t(scaled.Y+decoHeight))
 	}
-	if scaled := w.config.MaxSize.Div(w.scale); scaled != (image.Point{}) {
+	if scaled := w.toSurface(w.config.MaxSize); scaled != (image.Point{}) {
 		C.xdg_toplevel_set_max_size(w.topLvl, C.int32_t(scaled.X), C.int32_t(scaled.Y+decoHeight))
 	}
 }
@@ -1215,6 +1272,7 @@ func (w *window) resize(serial, edge C.uint32_t) {
 }
 
 func (w *window) SetCursor(cursor pointer.Cursor) {
+	w.cursor.name = cursor
 	w.cursor.cursor = w.loadCursor(cursor)
 	w.updateCursor()
 }
@@ -1243,7 +1301,25 @@ func (w *window) setCursor(pointer *C.struct_wl_pointer, serial C.uint32_t) {
 	if buf == nil {
 		return
 	}
-	C.wl_pointer_set_cursor(pointer, serial, w.cursor.surf, C.int32_t(img.hotspot_x/C.uint(w.scale)), C.int32_t(img.hotspot_y/C.uint(w.scale)))
+	// A buffer that is not a multiple of the buffer scale is a protocol
+	// error; such an image is scaled with a viewport instead.
+	scale := C.uint(w.cursor.scale)
+	bs, hs := scale, scale
+	if img.width%scale != 0 || img.height%scale != 0 {
+		bs, hs = 1, 1
+		if w.disp.viewporter != nil {
+			if w.cursor.viewport == nil {
+				w.cursor.viewport = C.wp_viewporter_get_viewport(w.disp.viewporter, w.cursor.surf)
+			}
+			C.wp_viewport_set_destination(w.cursor.viewport, C.int32_t(max(1, img.width/scale)), C.int32_t(max(1, img.height/scale)))
+			hs = scale
+		}
+	} else if w.cursor.viewport != nil {
+		C.wp_viewport_destroy(w.cursor.viewport)
+		w.cursor.viewport = nil
+	}
+	C.wl_surface_set_buffer_scale(w.cursor.surf, C.int32_t(bs))
+	C.wl_pointer_set_cursor(pointer, serial, w.cursor.surf, C.int32_t(img.hotspot_x/hs), C.int32_t(img.hotspot_y/hs))
 	C.wl_surface_attach(w.cursor.surf, buf, 0, 0)
 	C.wl_surface_damage(w.cursor.surf, 0, 0, C.int32_t(img.width), C.int32_t(img.height))
 	C.wl_surface_commit(w.cursor.surf)
@@ -1591,11 +1667,20 @@ func (w *window) destroy() {
 		C.wl_callback_destroy(w.lastFrameCallback)
 		w.lastFrameCallback = nil
 	}
+	if w.cursor.viewport != nil {
+		C.wp_viewport_destroy(w.cursor.viewport)
+	}
 	if w.cursor.surf != nil {
 		C.wl_surface_destroy(w.cursor.surf)
 	}
 	if w.cursor.theme != nil {
 		C.wl_cursor_theme_destroy(w.cursor.theme)
+	}
+	if w.fracScale != nil {
+		C.wp_fractional_scale_v1_destroy(w.fracScale)
+	}
+	if w.viewport != nil {
+		C.wp_viewport_destroy(w.viewport)
 	}
 	if w.topLvl != nil {
 		C.xdg_toplevel_destroy(w.topLvl)
@@ -1671,7 +1756,7 @@ func (s *wlSeat) sendCursorRectangle(w *window) {
 	sel := w.w.EditorState().Selection
 	top := sel.Transform.Transform(sel.Caret.Pos.Sub(f32.Pt(0, sel.Caret.Ascent)))
 	bottom := sel.Transform.Transform(sel.Caret.Pos.Add(f32.Pt(0, sel.Caret.Descent)))
-	scale := float32(max(1, w.scale))
+	scale := w.pxScale()
 	minX, maxX := min(top.X, bottom.X)/scale, max(top.X, bottom.X)/scale
 	minY, maxY := min(top.Y, bottom.Y)/scale, max(top.Y, bottom.Y)/scale
 	x, y := math.Floor(float64(minX)), math.Floor(float64(minY))
@@ -1889,8 +1974,8 @@ func (w *window) flushScroll() {
 func (w *window) onPointerMotion(x, y C.wl_fixed_t, t C.uint32_t) {
 	w.flushScroll()
 	w.lastPos = f32.Point{
-		X: fromFixed(x) * float32(w.scale),
-		Y: fromFixed(y) * float32(w.scale),
+		X: fromFixed(x) * w.pxScale(),
+		Y: fromFixed(y) * w.pxScale(),
 	}
 	w.ProcessEvent(pointer.Event{
 		Kind:      pointer.Move,
@@ -1966,18 +2051,63 @@ func (w *window) updateOutputs() {
 	if !found {
 		return
 	}
-	if scale != w.scale {
-		w.scale = scale
-		C.wl_surface_set_buffer_scale(w.surf, C.int32_t(w.scale))
+	// With fractional scaling, the compositor sends the scale.
+	if w.fracScale == nil {
+		w.setScale(scale * 120)
 	}
 	w.draw(true)
 }
 
+//export gio_onPreferredScale
+func gio_onPreferredScale(data unsafe.Pointer, fs *C.struct_wp_fractional_scale_v1, scale C.uint32_t) {
+	w := callbackLoad(data).(*window)
+	if s := int(scale); s > 0 && s != w.scale {
+		w.setScale(s)
+		w.draw(true)
+	}
+}
+
+func (w *window) setScale(scale int) {
+	if scale == w.scale {
+		return
+	}
+	w.scale = scale
+	if w.viewport == nil {
+		C.wl_surface_set_buffer_scale(w.surf, C.int32_t(w.bufferScale()))
+	}
+	if prev := w.cursor.scale; w.loadCursorTheme() == nil && w.cursor.scale != prev {
+		w.updateCursor()
+	}
+}
+
+// bufferScale is the integer buffer scale, rounded up.
+func (w *window) bufferScale() int {
+	return (w.scale + 119) / 120
+}
+
+// pxScale is the ratio of buffer pixels to surface coordinates.
+func (w *window) pxScale() float32 {
+	return float32(w.scale) / 120
+}
+
+func (w *window) toBuffer(p image.Point) image.Point {
+	return image.Pt((p.X*w.scale+60)/120, (p.Y*w.scale+60)/120)
+}
+
+func (w *window) toSurface(p image.Point) image.Point {
+	if w.viewport == nil {
+		// Truncate like before fractional scaling.
+		return p.Div(w.bufferScale())
+	}
+	return image.Pt((p.X*120+w.scale/2)/w.scale, (p.Y*120+w.scale/2)/w.scale)
+}
+
 func (w *window) getConfig() (image.Point, unit.Metric) {
-	size := w.size.Mul(w.scale)
+	size := w.toBuffer(w.size)
+	s := w.pxScale()
 	return size, unit.Metric{
-		PxPerDp: w.ppdp * float32(w.scale),
-		PxPerSp: w.ppsp * float32(w.scale),
+		PxPerDp: w.ppdp * s,
+		PxPerSp: w.ppsp * s,
 	}
 }
 
@@ -1989,6 +2119,9 @@ func (w *window) draw(sync bool) {
 	size, cfg := w.getConfig()
 	if cfg == (unit.Metric{}) {
 		return
+	}
+	if w.viewport != nil && w.size.X > 0 && w.size.Y > 0 {
+		C.wp_viewport_set_destination(w.viewport, C.int32_t(w.size.X), C.int32_t(w.size.Y))
 	}
 	if size != w.config.Size {
 		w.config.Size = size
@@ -2223,6 +2356,12 @@ func (d *wlDisplay) destroy() {
 	}
 	if d.wm != nil {
 		C.xdg_wm_base_destroy(d.wm)
+	}
+	if d.viewporter != nil {
+		C.wp_viewporter_destroy(d.viewporter)
+	}
+	if d.fracScaleMgr != nil {
+		C.wp_fractional_scale_manager_v1_destroy(d.fracScaleMgr)
 	}
 	for _, output := range d.outputMap {
 		C.wl_output_destroy(output)
