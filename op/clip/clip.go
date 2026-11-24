@@ -118,6 +118,9 @@ type PathSpec struct {
 	hash        uint64
 }
 
+// Empty reports whether the path contains no segments.
+func (p PathSpec) Empty() bool { return !p.hasSegments }
+
 // Path constructs a Op clip path described by lines and
 // Bézier curves, where drawing outside the Path is discarded.
 // The inside-ness of a pixel is determines by the non-zero winding rule,
