@@ -14,6 +14,8 @@ type Content struct {
 type WriteCmd struct {
 	// Each MIME type should occur at most once. An empty slice clears the clipboard.
 	// All platforms support "application/text" and "text/plain".
+	// Windows also supports "image/png", "text/html",
+	// "application/rtf", and "text/rtf".
 	Contents []Content
 	// Sensitive marks the contents as a secret, such as a password. Where the
 	// platform has a convention for it, the clipboard content is marked so
