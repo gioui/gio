@@ -988,6 +988,21 @@ func TestTransfer(t *testing.T) {
 		return src, tgt
 	}
 
+	t.Run("cancel pointer", func(t *testing.T) {
+		var r Router
+		var ops op.Ops
+		src, tgt := setup(&r, &ops, "file", "file")
+		r.Frame(&ops)
+		r.Queue(
+			pointer.Event{Kind: pointer.Press, Position: f32.Pt(10, 10)},
+			pointer.Event{Kind: pointer.Move, Position: f32.Pt(40, 10)},
+			pointer.Event{Kind: pointer.Cancel},
+		)
+		assertEventSequence(t, events(&r, -1, transfer.SourceFilter{Target: src, Type: "file"}), transfer.CancelEvent{})
+		assertEventSequence(t, events(&r, -1, transfer.TargetFilter{Target: tgt, Type: "file"}),
+			transfer.InitiateEvent{Types: []string{"file"}}, transfer.CancelEvent{})
+	})
+
 	t.Run("drop on no target", func(t *testing.T) {
 		ops := new(op.Ops)
 		var r Router

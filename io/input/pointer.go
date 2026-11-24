@@ -764,6 +764,9 @@ func (q *pointerQueue) SemanticArea(areaIdx int) (semanticContent, int) {
 func (q *pointerQueue) Push(handlers map[event.Tag]*handler, state pointerState, e pointer.Event) (pointerState, []taggedEvent) {
 	var evts []taggedEvent
 	if e.Kind == pointer.Cancel {
+		for _, p := range state.pointers {
+			evts = p.transfer.cancel(handlers, evts)
+		}
 		for k := range handlers {
 			evts = append(evts, taggedEvent{
 				event: pointer.Event{Kind: pointer.Cancel},
