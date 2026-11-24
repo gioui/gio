@@ -1003,6 +1003,58 @@ func TestTransfer(t *testing.T) {
 			transfer.InitiateEvent{Types: []string{"file"}}, transfer.CancelEvent{})
 	})
 
+	t.Run("hover", func(t *testing.T) {
+		var r Router
+		var ops op.Ops
+		src, tgt := setup(&r, &ops, "file", "file")
+		target := transfer.TargetFilter{Target: tgt, Type: "file"}
+		hover := pointer.Filter{Target: tgt, Kinds: pointer.Enter | pointer.Leave | pointer.Drag | pointer.Cancel}
+		events(&r, -1, hover)
+		other := addPointerHandler(&r, &ops, new(int), image.Rect(20, 0, 40, 20))
+		r.Frame(&ops)
+		r.Queue(
+			pointer.Event{Kind: pointer.Press, Position: f32.Pt(10, 10)},
+			pointer.Event{Kind: pointer.Move, Position: f32.Pt(10, 10)},
+		)
+		assertEventTypeSequence(t, events(&r, -1, target), transfer.InitiateEvent{})
+		// Handlers outside the transfer are canceled and ignored.
+		assertEventPointerTypeSequence(t, events(&r, -1, other), pointer.Cancel)
+		r.Queue(pointer.Event{Kind: pointer.Move, Position: f32.Pt(30, 10)})
+		assertEventSequence(t, events(&r, -1, other))
+		r.Queue(pointer.Event{Kind: pointer.Move, Position: f32.Pt(45, 10)})
+		evts := events(&r, -1, hover)
+		assertEventPointerTypeSequence(t, evts, pointer.Enter, pointer.Drag)
+		if evts[1].(pointer.Event).Priority == pointer.Grabbed {
+			t.Error("drop target received the grab priority of the source")
+		}
+		r.Queue(pointer.Event{Kind: pointer.Leave})
+		assertEventPointerTypeSequence(t, events(&r, -1, hover), pointer.Leave)
+		r.Queue(pointer.Event{Kind: pointer.Move, Position: f32.Pt(45, 10)})
+		assertEventPointerTypeSequence(t, events(&r, -1, hover), pointer.Enter, pointer.Drag)
+		r.Queue(pointer.Event{Kind: pointer.Cancel})
+		assertEventSequence(t, events(&r, -1, target), transfer.CancelEvent{})
+		assertEventPointerTypeSequence(t, events(&r, -1, hover), pointer.Cancel)
+		assertEventSequence(t, events(&r, -1, transfer.SourceFilter{Target: src, Type: "file"}), transfer.CancelEvent{})
+	})
+
+	t.Run("other touch keeps its handler", func(t *testing.T) {
+		var r Router
+		var ops op.Ops
+		setup(&r, &ops, "file", "file")
+		other := addPointerHandler(&r, &ops, new(int), image.Rect(60, 0, 80, 20))
+		r.Frame(&ops)
+		r.Queue(pointer.Event{Kind: pointer.Press, Source: pointer.Touch, PointerID: 2, Position: f32.Pt(65, 5)})
+		events(&r, -1, other)
+		r.Queue(
+			pointer.Event{Kind: pointer.Press, Source: pointer.Touch, PointerID: 1, Position: f32.Pt(5, 5)},
+			pointer.Event{Kind: pointer.Move, Source: pointer.Touch, PointerID: 1, Position: f32.Pt(5, 5)},
+			pointer.Event{Kind: pointer.Move, Source: pointer.Touch, PointerID: 2, Position: f32.Pt(65, 5)},
+			pointer.Event{Kind: pointer.Release, Source: pointer.Touch, PointerID: 2, Position: f32.Pt(65, 5)},
+		)
+		other.Kinds = pointer.Cancel | pointer.Drag | pointer.Release
+		assertEventPointerTypeSequence(t, events(&r, -1, other), pointer.Drag, pointer.Release)
+	})
+
 	t.Run("drop on no target", func(t *testing.T) {
 		ops := new(op.Ops)
 		var r Router

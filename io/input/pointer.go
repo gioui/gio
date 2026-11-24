@@ -411,7 +411,7 @@ func (c *pointerCollector) cursor(cursor pointer.Cursor) {
 
 func (q *pointerQueue) drop(handlers map[event.Tag]*handler, e DropEvent) []taggedEvent {
 	var drag transferState
-	evts := drag.start(handlers, nil, []string{e.Type}, nil)
+	evts := drag.start(handlers, nil, []string{e.Type}, nil, nil)
 	var entered []event.Tag
 	q.hitTest(e.Position, func(n *hitNode) bool {
 		if _, ok := handlers[n.tag]; ok {
@@ -791,7 +791,7 @@ func (q *pointerQueue) Push(handlers map[event.Tag]*handler, state pointerState,
 	case pointer.Move:
 		if p.pressed {
 			e.Kind = pointer.Drag
-			p, evts = q.deliverDragEvent(handlers, p, evts)
+			p, evts = q.deliverDragEvent(handlers, state.pressedHandlers(), p, evts)
 		}
 		p, evts, state.cursor, _ = q.deliverEnterLeaveEvents(handlers, state.cursor, p, evts, e)
 		evts = q.deliverEvent(handlers, p, evts, e)
@@ -831,11 +831,16 @@ func (q *pointerQueue) deliverScrollEvent(handlers map[event.Tag]*handler, evts 
 }
 
 func (q *pointerQueue) deliverEvent(handlers map[event.Tag]*handler, p pointerInfo, evts []taggedEvent, e pointer.Event) []taggedEvent {
-	if p.pressed && len(p.handlers) == 1 {
-		e.Priority = pointer.Grabbed
+	targets := p.handlers
+	if e.Kind == pointer.Drag && len(p.transfer.types) > 0 {
+		// Drop targets receive drag events even when the source has grabbed the pointer.
+		targets = slices.Clone(targets)
+		for _, k := range p.entered {
+			targets = addHandler(targets, k)
+		}
 	}
 	scroll := e.Scroll
-	for _, k := range p.handlers {
+	for _, k := range targets {
 		h, ok := handlers[k]
 		if !ok {
 			continue
@@ -851,6 +856,9 @@ func (q *pointerQueue) deliverEvent(handlers map[event.Tag]*handler, p pointerIn
 			scroll, e.Scroll = f.clampScroll(scroll)
 		}
 		e := e
+		if p.pressed && len(p.handlers) == 1 && k == p.handlers[0] {
+			e.Priority = pointer.Grabbed
+		}
 		e.Position = q.invTransform(h.pointer.areaPlusOne-1, e.Position)
 		evts = append(evts, taggedEvent{event: e, tag: k})
 	}
@@ -940,7 +948,7 @@ func (q *pointerQueue) deliverEnterLeaveEvents(handlers map[event.Tag]*handler, 
 	return p, evts, cursor, changed
 }
 
-func (q *pointerQueue) deliverDragEvent(handlers map[event.Tag]*handler, p pointerInfo, evts []taggedEvent) (pointerInfo, []taggedEvent) {
+func (q *pointerQueue) deliverDragEvent(handlers map[event.Tag]*handler, captured []event.Tag, p pointerInfo, evts []taggedEvent) (pointerInfo, []taggedEvent) {
 	if p.transfer.source != nil {
 		return p, evts
 	}
@@ -955,7 +963,7 @@ func (q *pointerQueue) deliverDragEvent(handlers map[event.Tag]*handler, p point
 			continue
 		}
 		// One data source handler per pointer.
-		evts = p.transfer.start(handlers, k, src.sourceMimes, evts)
+		evts = p.transfer.start(handlers, k, src.sourceMimes, captured, evts)
 		break
 	}
 	return p, evts
@@ -970,15 +978,30 @@ func (q *pointerQueue) deliverDropEvent(handlers map[event.Tag]*handler, p point
 	return p, evts
 }
 
-// start initiates a transfer of types from source.
-func (drag *transferState) start(handlers map[event.Tag]*handler, source event.Tag, types []string, evts []taggedEvent) []taggedEvent {
+// start initiates a transfer of types from source. Handlers that are
+// neither potential targets nor captured by a pressed pointer don't
+// take part in the transfer and receive a pointer.Cancel.
+func (drag *transferState) start(handlers map[event.Tag]*handler, source event.Tag, types []string, captured []event.Tag, evts []taggedEvent) []taggedEvent {
 	*drag = transferState{source: source, types: slices.Clone(types)}
 	for k, h := range handlers {
 		if _, ok := firstMimeMatch(types, &h.filter.pointer); ok {
 			evts = append(evts, taggedEvent{tag: k, event: transfer.InitiateEvent{Types: slices.Clone(types)}})
+		} else if !slices.Contains(captured, k) {
+			evts = append(evts, taggedEvent{tag: k, event: pointer.Event{Kind: pointer.Cancel}})
 		}
 	}
 	return evts
+}
+
+// pressedHandlers returns the handlers captured by pressed pointers.
+func (s pointerState) pressedHandlers() []event.Tag {
+	var captured []event.Tag
+	for _, p := range s.pointers {
+		if p.pressed {
+			captured = append(captured, p.handlers...)
+		}
+	}
+	return captured
 }
 
 // release selects the drop target and requests the data from the source.

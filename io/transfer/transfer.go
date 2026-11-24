@@ -10,7 +10,9 @@
 // When a user initiates a pointer-guided drag and drop transfer, the
 // potential targets receive an InitiateEvent.
 // Potential targets are targets with at least one MIME type in common
-// with the source. When a drag gesture completes, a CancelEvent is sent
+// with the source. During the drag, potential targets receive Enter, Drag
+// and Leave pointer events, and other handlers are canceled unless they
+// hold a pressed pointer. When a drag gesture completes, a CancelEvent is sent
 // to the source and all potential targets.
 //
 // The RequestEvent is sent to the source upon drop.
