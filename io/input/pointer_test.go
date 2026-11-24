@@ -926,6 +926,49 @@ func TestEllipse(t *testing.T) {
 	assertEventPointerTypeSequence(t, events(&r, -1, f), pointer.Press)
 }
 
+func TestTransferFirstMoveOutsideSource(t *testing.T) {
+	var r Router
+	var ops op.Ops
+	var source, target int
+	sourceFilter := transfer.SourceFilter{Target: &source, Type: "file"}
+	targetFilter := transfer.TargetFilter{Target: &target, Type: "file"}
+	events(&r, -1, sourceFilter, targetFilter)
+	sourceArea := clip.Rect(image.Rect(0, 0, 10, 10)).Push(&ops)
+	event.Op(&ops, &source)
+	sourceArea.Pop()
+	targetArea := clip.Rect(image.Rect(10, 0, 20, 10)).Push(&ops)
+	event.Op(&ops, &target)
+	targetArea.Pop()
+	r.Frame(&ops)
+	r.Queue(
+		pointer.Event{Kind: pointer.Press, Source: pointer.Mouse, Position: f32.Pt(5, 5)},
+		pointer.Event{Kind: pointer.Move, Source: pointer.Mouse, Position: f32.Pt(15, 5)},
+		pointer.Event{Kind: pointer.Release, Source: pointer.Mouse, Position: f32.Pt(15, 5)},
+	)
+	assertEventSequence(t, events(&r, -1, sourceFilter), transfer.RequestEvent{Type: "file"})
+}
+
+func TestTransferSourceRemovedBeforeFirstMove(t *testing.T) {
+	var r Router
+	var ops op.Ops
+	var source, target int
+	sourceFilter := transfer.SourceFilter{Target: &source, Type: "file"}
+	targetFilter := transfer.TargetFilter{Target: &target, Type: "file"}
+	r.Event(sourceFilter)
+	event.Op(&ops, &source)
+	r.Frame(&ops)
+	r.Queue(pointer.Event{Kind: pointer.Press, Source: pointer.Mouse})
+	ops.Reset()
+	r.Event(targetFilter)
+	event.Op(&ops, &target)
+	r.Frame(&ops)
+	r.Queue(
+		pointer.Event{Kind: pointer.Move, Source: pointer.Mouse, Position: f32.Pt(5, 5)},
+		pointer.Event{Kind: pointer.Release, Source: pointer.Mouse, Position: f32.Pt(5, 5)},
+	)
+	assertEventSequence(t, events(&r, -1, sourceFilter, targetFilter))
+}
+
 func TestTransfer(t *testing.T) {
 	srcArea := image.Rect(0, 0, 20, 20)
 	tgtArea := srcArea.Add(image.Pt(40, 0))

@@ -776,12 +776,10 @@ func (q *pointerQueue) Push(handlers map[event.Tag]*handler, state pointerState,
 	case pointer.Move:
 		if p.pressed {
 			e.Kind = pointer.Drag
+			p, evts = q.deliverDragEvent(handlers, p, evts)
 		}
 		p, evts, state.cursor, _ = q.deliverEnterLeaveEvents(handlers, state.cursor, p, evts, e)
 		evts = q.deliverEvent(handlers, p, evts, e)
-		if p.pressed {
-			p, evts = q.deliverDragEvent(handlers, p, evts)
-		}
 	case pointer.Leave:
 		p, evts, state.cursor, _ = q.deliverEnterLeaveEvents(handlers, state.cursor, p, evts, e)
 	case pointer.Release:
@@ -933,7 +931,11 @@ func (q *pointerQueue) deliverDragEvent(handlers map[event.Tag]*handler, p point
 	}
 	// Identify the data source.
 	for _, k := range p.entered {
-		src := &handlers[k].filter.pointer
+		handler, ok := handlers[k]
+		if !ok {
+			continue
+		}
+		src := &handler.filter.pointer
 		if len(src.sourceMimes) == 0 {
 			continue
 		}
