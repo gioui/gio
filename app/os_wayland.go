@@ -196,8 +196,14 @@ type window struct {
 		// such as border resizes and window moves. It
 		// is nil if the pointer is not in a system gesture
 		// area.
-		system  *C.struct_wl_cursor
-		surf    *C.struct_wl_surface
+		system   *C.struct_wl_cursor
+		surf     *C.struct_wl_surface
+		viewport *C.struct_wp_viewport
+		name     pointer.Cursor
+		// size is the theme size (XCURSOR_SIZE) and scale the buffer
+		// scale the theme is loaded for.
+		size    int
+		scale   int
 		cursors struct {
 			pointer         *C.struct_wl_cursor
 			resizeNorth     *C.struct_wl_cursor
@@ -414,33 +420,23 @@ func (d *wlDisplay) createNativeWindow(options []Option) (*window, error) {
 	defer C.free(unsafe.Pointer(id))
 	C.xdg_toplevel_set_app_id(w.topLvl, id)
 
-	cursorTheme := C.CString(os.Getenv("XCURSOR_THEME"))
-	defer C.free(unsafe.Pointer(cursorTheme))
-	cursorSize := 32
+	w.cursor.size = 32
 	if envSize, ok := os.LookupEnv("XCURSOR_SIZE"); ok && envSize != "" {
 		size, err := strconv.Atoi(envSize)
 		if err == nil {
-			cursorSize = size
+			w.cursor.size = size
 		}
 	}
-
-	w.cursor.theme = C.wl_cursor_theme_load(cursorTheme, C.int(cursorSize*w.bufferScale()), d.shm)
-	if w.cursor.theme == nil {
+	if err := w.loadCursorTheme(); err != nil {
 		w.destroy()
-		return nil, errors.New("wayland: wl_cursor_theme_load failed")
+		return nil, err
 	}
-	w.loadCursors()
 	w.cursor.cursor = w.cursor.cursors.pointer
-	if w.cursor.cursor == nil {
-		w.destroy()
-		return nil, errors.New("wayland: wl_cursor_theme_get_cursor failed")
-	}
 	w.cursor.surf = C.wl_compositor_create_surface(d.compositor)
 	if w.cursor.surf == nil {
 		w.destroy()
 		return nil, errors.New("wayland: wl_compositor_create_surface failed")
 	}
-	C.wl_surface_set_buffer_scale(w.cursor.surf, C.int32_t(w.bufferScale()))
 	C.xdg_wm_base_add_listener(d.wm, &C.gio_xdg_wm_base_listener, unsafe.Pointer(w.surf))
 	C.wl_surface_add_listener(w.surf, &C.gio_surface_listener, unsafe.Pointer(w.surf))
 	C.xdg_surface_add_listener(w.wmSurf, &C.gio_xdg_surface_listener, unsafe.Pointer(w.surf))
@@ -452,6 +448,43 @@ func (d *wlDisplay) createNativeWindow(options []Option) (*window, error) {
 	}
 	w.updateOpaqueRegion()
 	return w, nil
+}
+
+// loadCursorTheme loads the cursor theme for the buffer scale of the
+// window, unless it is already loaded for that scale.
+func (w *window) loadCursorTheme() error {
+	scale := w.bufferScale()
+	if w.cursor.theme != nil && scale == w.cursor.scale {
+		return nil
+	}
+	name := C.CString(os.Getenv("XCURSOR_THEME"))
+	defer C.free(unsafe.Pointer(name))
+	theme := C.wl_cursor_theme_load(name, C.int(w.cursor.size*scale), w.disp.shm)
+	if theme == nil {
+		return errors.New("wayland: wl_cursor_theme_load failed")
+	}
+	oldTheme, oldCursors := w.cursor.theme, w.cursor.cursors
+	w.cursor.theme = theme
+	w.cursor.cursors.pointer = nil
+	w.loadCursors()
+	if w.cursor.cursors.pointer == nil {
+		w.cursor.theme, w.cursor.cursors = oldTheme, oldCursors
+		C.wl_cursor_theme_destroy(theme)
+		return errors.New("wayland: wl_cursor_theme_get_cursor failed")
+	}
+	w.cursor.scale = scale
+	if oldTheme == nil {
+		return nil
+	}
+	w.cursor.cursor = w.loadCursor(w.cursor.name)
+	if w.cursor.system != nil {
+		w.cursor.system, _ = w.systemGesture()
+	}
+	// Release the buffer of the old theme before destroying it.
+	C.wl_surface_attach(w.cursor.surf, nil, 0, 0)
+	C.wl_surface_commit(w.cursor.surf)
+	C.wl_cursor_theme_destroy(oldTheme)
+	return nil
 }
 
 func (w *window) loadCursors() {
@@ -1239,6 +1272,7 @@ func (w *window) resize(serial, edge C.uint32_t) {
 }
 
 func (w *window) SetCursor(cursor pointer.Cursor) {
+	w.cursor.name = cursor
 	w.cursor.cursor = w.loadCursor(cursor)
 	w.updateCursor()
 }
@@ -1267,8 +1301,25 @@ func (w *window) setCursor(pointer *C.struct_wl_pointer, serial C.uint32_t) {
 	if buf == nil {
 		return
 	}
-	bs := C.uint(w.bufferScale())
-	C.wl_pointer_set_cursor(pointer, serial, w.cursor.surf, C.int32_t(img.hotspot_x/bs), C.int32_t(img.hotspot_y/bs))
+	// A buffer that is not a multiple of the buffer scale is a protocol
+	// error; such an image is scaled with a viewport instead.
+	scale := C.uint(w.cursor.scale)
+	bs, hs := scale, scale
+	if img.width%scale != 0 || img.height%scale != 0 {
+		bs, hs = 1, 1
+		if w.disp.viewporter != nil {
+			if w.cursor.viewport == nil {
+				w.cursor.viewport = C.wp_viewporter_get_viewport(w.disp.viewporter, w.cursor.surf)
+			}
+			C.wp_viewport_set_destination(w.cursor.viewport, C.int32_t(max(1, img.width/scale)), C.int32_t(max(1, img.height/scale)))
+			hs = scale
+		}
+	} else if w.cursor.viewport != nil {
+		C.wp_viewport_destroy(w.cursor.viewport)
+		w.cursor.viewport = nil
+	}
+	C.wl_surface_set_buffer_scale(w.cursor.surf, C.int32_t(bs))
+	C.wl_pointer_set_cursor(pointer, serial, w.cursor.surf, C.int32_t(img.hotspot_x/hs), C.int32_t(img.hotspot_y/hs))
 	C.wl_surface_attach(w.cursor.surf, buf, 0, 0)
 	C.wl_surface_damage(w.cursor.surf, 0, 0, C.int32_t(img.width), C.int32_t(img.height))
 	C.wl_surface_commit(w.cursor.surf)
@@ -1615,6 +1666,9 @@ func (w *window) destroy() {
 	if w.lastFrameCallback != nil {
 		C.wl_callback_destroy(w.lastFrameCallback)
 		w.lastFrameCallback = nil
+	}
+	if w.cursor.viewport != nil {
+		C.wp_viewport_destroy(w.cursor.viewport)
 	}
 	if w.cursor.surf != nil {
 		C.wl_surface_destroy(w.cursor.surf)
@@ -2020,6 +2074,9 @@ func (w *window) setScale(scale int) {
 	w.scale = scale
 	if w.viewport == nil {
 		C.wl_surface_set_buffer_scale(w.surf, C.int32_t(w.bufferScale()))
+	}
+	if prev := w.cursor.scale; w.loadCursorTheme() == nil && w.cursor.scale != prev {
+		w.updateCursor()
 	}
 }
 
