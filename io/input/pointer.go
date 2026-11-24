@@ -965,7 +965,7 @@ func (q *pointerQueue) deliverDropEvent(handlers map[event.Tag]*handler, p point
 func (q *pointerQueue) initiateTransfer(handlers map[event.Tag]*handler, types []string, evts []taggedEvent) []taggedEvent {
 	for k, h := range handlers {
 		if _, ok := firstMimeMatch(types, &h.filter.pointer); ok {
-			evts = append(evts, taggedEvent{tag: k, event: transfer.InitiateEvent{}})
+			evts = append(evts, taggedEvent{tag: k, event: transfer.InitiateEvent{Types: slices.Clone(types)}})
 		}
 	}
 	return evts

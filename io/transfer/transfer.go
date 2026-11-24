@@ -76,7 +76,10 @@ func (RequestEvent) ImplementsEvent() {}
 
 // InitiateEvent is sent to potential data targets when a drag-and-drop
 // transfer gesture is initiated.
-type InitiateEvent struct{}
+type InitiateEvent struct {
+	// Types lists the MIME types offered by the source.
+	Types []string
+}
 
 func (InitiateEvent) ImplementsEvent() {}
 

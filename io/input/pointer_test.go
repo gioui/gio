@@ -1005,7 +1005,7 @@ func TestTransfer(t *testing.T) {
 			},
 		)
 		assertEventSequence(t, events(&r, -1, transfer.SourceFilter{Target: src, Type: "file"}))
-		assertEventSequence(t, events(&r, -1, transfer.TargetFilter{Target: tgt, Type: "file"}), transfer.InitiateEvent{})
+		assertEventSequence(t, events(&r, -1, transfer.TargetFilter{Target: tgt, Type: "file"}), transfer.InitiateEvent{Types: []string{"file"}})
 
 		// Drop.
 		r.Queue(
@@ -1044,7 +1044,7 @@ func TestTransfer(t *testing.T) {
 			},
 		)
 		assertEventSequence(t, events(&r, -1, transfer.SourceFilter{Target: src, Type: "file"}))
-		assertEventSequence(t, events(&r, -1, transfer.TargetFilter{Target: tgt1, Type: "file"}), transfer.InitiateEvent{})
+		assertEventSequence(t, events(&r, -1, transfer.TargetFilter{Target: tgt1, Type: "file"}), transfer.InitiateEvent{Types: []string{"file"}})
 		assertEventSequence(t, events(&r, -1, transfer.TargetFilter{Target: tgt2, Type: "nofile"}))
 	})
 
@@ -1096,7 +1096,7 @@ func TestTransfer(t *testing.T) {
 				Kind:     pointer.Move,
 			},
 		)
-		assertEventSequence(t, events(&r, 1, transfer.TargetFilter{Target: tgt, Type: "file"}), transfer.InitiateEvent{})
+		assertEventSequence(t, events(&r, 1, transfer.TargetFilter{Target: tgt, Type: "file"}), transfer.InitiateEvent{Types: []string{"file"}})
 
 		// Drop.
 		r.Queue(
@@ -1178,7 +1178,7 @@ func TestTransfer(t *testing.T) {
 			pointer.Event{Kind: pointer.Press, Position: f32.Pt(10, 10)},
 			pointer.Event{Kind: pointer.Move, Position: f32.Pt(10, 10)},
 		)
-		assertEventSequence(t, events(&r, -1, transfer.TargetFilter{Target: tgt, Type: "text/plain"}), transfer.InitiateEvent{})
+		assertEventSequence(t, events(&r, -1, transfer.TargetFilter{Target: tgt, Type: "text/plain"}), transfer.InitiateEvent{Types: []string{"text/plain"}})
 		events(&r, -1, transfer.SourceFilter{Target: src, Type: "image/png"})
 		events(&r, -1, transfer.TargetFilter{Target: tgt, Type: "image/png"})
 		r.Frame(&ops)
@@ -1199,7 +1199,7 @@ func TestTransfer(t *testing.T) {
 			pointer.Event{Kind: pointer.Release, Position: f32.Pt(40, 10)},
 		)
 		assertEventSequence(t, events(&r, -1, source), transfer.RequestEvent{Type: "file"})
-		assertEventSequence(t, events(&r, -1, target), transfer.InitiateEvent{})
+		assertEventSequence(t, events(&r, -1, target), transfer.InitiateEvent{Types: []string{"file"}})
 		r.Queue(DropEvent{
 			Position: f32.Pt(40, 10),
 			Type:     "file",
@@ -1212,7 +1212,7 @@ func TestTransfer(t *testing.T) {
 		if len(evs) != 3 {
 			t.Fatalf("received %v; want initiate, data, cancel", evs)
 		}
-		assertEventSequence(t, evs[:1], transfer.InitiateEvent{})
+		assertEventSequence(t, evs[:1], transfer.InitiateEvent{Types: []string{"file"}})
 		assertEventSequence(t, evs[2:], transfer.CancelEvent{})
 		reader := evs[1].(transfer.DataEvent).Open()
 		data, err := io.ReadAll(reader)

@@ -145,13 +145,13 @@ func TestExternalDrop(t *testing.T) {
 					continue
 				}
 				if i != test.want {
-					assertEventSequence(t, evs, transfer.InitiateEvent{}, transfer.CancelEvent{})
+					assertEventSequence(t, evs, transfer.InitiateEvent{Types: []string{"text/uri-list"}}, transfer.CancelEvent{})
 					continue
 				}
 				if len(evs) != 3 {
 					t.Fatalf("target %d received %v; want initiate, data, cancel", i, evs)
 				}
-				assertEventSequence(t, evs[:1], transfer.InitiateEvent{})
+				assertEventSequence(t, evs[:1], transfer.InitiateEvent{Types: []string{"text/uri-list"}})
 				assertEventSequence(t, evs[2:], transfer.CancelEvent{})
 				de, ok := evs[1].(transfer.DataEvent)
 				if !ok || de.Type != "text/uri-list" {
@@ -229,7 +229,7 @@ func TestExternalDropReplay(t *testing.T) {
 	if len(evs) != 3 {
 		t.Fatalf("received %v; want initiate, data, cancel", evs)
 	}
-	assertEventSequence(t, evs[:1], transfer.InitiateEvent{})
+	assertEventSequence(t, evs[:1], transfer.InitiateEvent{Types: []string{"text/uri-list"}})
 	assertEventSequence(t, evs[2:], transfer.CancelEvent{})
 	reader := evs[1].(transfer.DataEvent).Open()
 	data, err := io.ReadAll(reader)
@@ -275,7 +275,7 @@ func TestExternalDropDeferred(t *testing.T) {
 	if len(evs) != 3 {
 		t.Fatalf("received %v; want initiate, data, cancel", evs)
 	}
-	assertEventSequence(t, evs[:1], transfer.InitiateEvent{})
+	assertEventSequence(t, evs[:1], transfer.InitiateEvent{Types: []string{"text/uri-list"}})
 	assertEventSequence(t, evs[2:], transfer.CancelEvent{})
 	reader := evs[1].(transfer.DataEvent).Open()
 	data, err := io.ReadAll(reader)
