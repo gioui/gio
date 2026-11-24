@@ -6,6 +6,7 @@
 #include "wayland_xdg_shell.h"
 #include "wayland_xdg_decoration.h"
 #include "wayland_text_input.h"
+#include "wayland_fractional_scale.h"
 #include "_cgo_export.h"
 
 const struct wl_registry_listener gio_registry_listener = {
@@ -50,6 +51,10 @@ const struct wl_output_listener gio_output_listener = {
 	.mode = gio_onOutputMode,
 	.done = gio_onOutputDone,
 	.scale = gio_onOutputScale,
+};
+
+const struct wp_fractional_scale_v1_listener gio_fractional_scale_listener = {
+	.preferred_scale = gio_onPreferredScale,
 };
 
 const struct wl_seat_listener gio_seat_listener = {
