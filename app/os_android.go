@@ -123,7 +123,6 @@ import (
 	"fmt"
 	"image"
 	"image/color"
-	"io"
 	"math"
 	"os"
 	"path/filepath"
@@ -131,13 +130,10 @@ import (
 	"runtime/cgo"
 	"runtime/debug"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 	"unicode/utf16"
 	"unsafe"
-
-	"gioui.org/io/transfer"
 
 	"gioui.org/internal/f32color"
 	"gioui.org/op"
@@ -1406,8 +1402,12 @@ func newWindow(window *callbacks, options []Option) {
 }
 
 func (w *window) WriteClipboard(c clipboardContent) {
+	data, ok := c.text()
+	if !ok {
+		return
+	}
 	runInJVM(javaVM(), func(env *C.JNIEnv) {
-		jstr := javaString(env, string(c.data))
+		jstr := javaString(env, string(data))
 		jsensitive := jvalue(C.JNI_FALSE)
 		if c.sensitive {
 			jsensitive = jvalue(C.JNI_TRUE)
@@ -1417,20 +1417,19 @@ func (w *window) WriteClipboard(c clipboardContent) {
 	})
 }
 
-func (w *window) ReadClipboard() {
+func (w *window) ReadClipboard(types []string) {
+	if !wantsClipboardText(types) {
+		w.processEvent(clipboardEvent(types, nil))
+		return
+	}
 	runInJVM(javaVM(), func(env *C.JNIEnv) {
 		c, err := callStaticObjectMethod(env, android.gioCls, android.mreadClipboard,
 			jvalue(android.appCtx))
-		if err != nil {
-			return
+		var content string
+		if err == nil && c != 0 {
+			content = goString(env, C.jstring(c))
 		}
-		content := goString(env, C.jstring(c))
-		w.processEvent(transfer.DataEvent{
-			Type: "application/text",
-			Open: func() io.ReadCloser {
-				return io.NopCloser(strings.NewReader(content))
-			},
-		})
+		w.processEvent(clipboardTextEvent(types, content))
 	})
 }
 

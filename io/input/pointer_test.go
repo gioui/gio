@@ -1077,10 +1077,10 @@ func TestTransfer(t *testing.T) {
 		if !ok {
 			t.Fatalf("unexpected event type: %T, want %T", dataEvent, transfer.DataEvent{})
 		}
-		if got, want := dataEvent.Type, "file"; got != want {
+		if got, want := dataEvent.Types[0], "file"; got != want {
 			t.Fatalf("got %s; want %s", got, want)
 		}
-		if got, want := dataEvent.Open(), ofr; got != want {
+		if got, want := dataEvent.Open("file"), ofr; got != want {
 			t.Fatalf("got %v; want %v", got, want)
 		}
 
@@ -1171,7 +1171,7 @@ func TestTransfer(t *testing.T) {
 		}
 		assertEventSequence(t, evs[:1], transfer.InitiateEvent{})
 		assertEventSequence(t, evs[2:], transfer.CancelEvent{})
-		reader := evs[1].(transfer.DataEvent).Open()
+		reader := evs[1].(transfer.DataEvent).Open("file")
 		data, err := io.ReadAll(reader)
 		if err := reader.Close(); err != nil {
 			t.Fatal(err)
@@ -1188,7 +1188,7 @@ func TestTransfer(t *testing.T) {
 			t.Fatalf("received %v; want data, cancel", evs)
 		}
 		assertEventSequence(t, evs[1:], transfer.CancelEvent{})
-		if got := evs[0].(transfer.DataEvent).Open(); got != ofr {
+		if got := evs[0].(transfer.DataEvent).Open("file"); got != ofr {
 			t.Fatalf("internal reader = %v; want %v", got, ofr)
 		}
 		if err := ofr.Close(); err != nil {

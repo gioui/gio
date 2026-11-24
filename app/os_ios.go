@@ -78,12 +78,10 @@ import "C"
 
 import (
 	"image"
-	"io"
 	"os"
 	"runtime"
 	"runtime/cgo"
 	"runtime/debug"
-	"strings"
 	"time"
 	"unicode/utf16"
 	"unsafe"
@@ -93,7 +91,6 @@ import (
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
-	"gioui.org/io/transfer"
 	"gioui.org/op"
 	"gioui.org/unit"
 )
@@ -294,20 +291,26 @@ func onTouch(h C.uintptr_t, last C.int, touchRef C.CFTypeRef, phase C.NSInteger,
 	})
 }
 
-func (w *window) ReadClipboard() {
+func (w *window) ReadClipboard(types []string) {
+	if !wantsClipboardText(types) {
+		w.ProcessEvent(clipboardEvent(types, nil))
+		return
+	}
 	cstr := C.readClipboard()
-	defer C.CFRelease(cstr)
-	content := nsstringToString(cstr)
-	w.ProcessEvent(transfer.DataEvent{
-		Type: "application/text",
-		Open: func() io.ReadCloser {
-			return io.NopCloser(strings.NewReader(content))
-		},
-	})
+	var content string
+	if cstr != 0 {
+		defer C.CFRelease(cstr)
+		content = nsstringToString(cstr)
+	}
+	w.ProcessEvent(clipboardTextEvent(types, content))
 }
 
 func (w *window) WriteClipboard(c clipboardContent) {
-	u16 := utf16.Encode([]rune(string(c.data)))
+	data, ok := c.text()
+	if !ok {
+		return
+	}
+	u16 := utf16.Encode([]rune(string(data)))
 	chars := (*C.unichar)(unsafe.Pointer(unsafe.SliceData(u16)))
 	var sens C.int
 	if c.sensitive {

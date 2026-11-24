@@ -116,7 +116,7 @@ func ExampleDraggable_Layout() {
 			}
 			switch e := ev.(type) {
 			case transfer.DataEvent:
-				data := e.Open()
+				data := e.Open(mime)
 				defer data.Close()
 				content, _ := io.ReadAll(data)
 				fmt.Println(string(content))

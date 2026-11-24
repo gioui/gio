@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"image"
 	"image/color"
-	"io"
 	"strings"
 	"syscall/js"
 	"time"
@@ -21,7 +20,6 @@ import (
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
-	"gioui.org/io/transfer"
 	"gioui.org/unit"
 )
 
@@ -42,6 +40,7 @@ type window struct {
 	document              js.Value
 	head                  js.Value
 	clipboard             js.Value
+	clipboardReads        []string
 	cnv                   js.Value
 	tarea                 js.Value
 	w                     *callbacks
@@ -102,13 +101,13 @@ func newWindow(win *callbacks, options []Option) {
 		return nil
 	})
 	w.clipboardCallback = w.funcOf(func(this js.Value, args []js.Value) interface{} {
-		content := args[0].String()
-		w.processEvent(transfer.DataEvent{
-			Type: "application/text",
-			Open: func() io.ReadCloser {
-				return io.NopCloser(strings.NewReader(content))
-			},
-		})
+		var content string
+		if len(args) > 0 && args[0].Type() == js.TypeString {
+			content = args[0].String()
+		}
+		reads := w.clipboardReads
+		w.clipboardReads = nil
+		w.processEvent(clipboardTextEvent(reads, content))
 		return nil
 	})
 	w.addEventListeners()
@@ -859,23 +858,35 @@ func (w *window) SetAnimating(anim bool) {
 	}
 }
 
-func (w *window) ReadClipboard() {
-	if w.clipboard.IsUndefined() {
+func (w *window) ReadClipboard(types []string) {
+	if !wantsClipboardText(types) {
+		w.processEvent(clipboardEvent(types, nil))
 		return
 	}
-	if w.clipboard.Get("readText").Truthy() {
-		w.clipboard.Call("readText").Call("then", w.clipboardCallback)
+	pending := len(w.clipboardReads) > 0
+	w.clipboardReads = append(w.clipboardReads, types...)
+	if pending {
+		return
 	}
+	if w.clipboard.IsUndefined() || !w.clipboard.Get("readText").Truthy() {
+		w.clipboardCallback.Invoke()
+		return
+	}
+	w.clipboard.Call("readText").Call("then", w.clipboardCallback, w.clipboardCallback)
 }
 
 func (w *window) WriteClipboard(c clipboardContent) {
+	data, ok := c.text()
+	if !ok {
+		return
+	}
 	if w.clipboard.IsUndefined() {
 		return
 	}
 	if w.clipboard.Get("writeText").IsUndefined() {
 		return
 	}
-	w.clipboard.Call("writeText", string(c.data))
+	w.clipboard.Call("writeText", string(data))
 }
 
 func (w *window) Configure(options []Option) {

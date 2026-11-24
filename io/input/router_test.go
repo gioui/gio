@@ -154,10 +154,10 @@ func TestExternalDrop(t *testing.T) {
 				assertEventSequence(t, evs[:1], transfer.InitiateEvent{})
 				assertEventSequence(t, evs[2:], transfer.CancelEvent{})
 				de, ok := evs[1].(transfer.DataEvent)
-				if !ok || de.Type != "text/uri-list" {
+				if !ok || len(de.Types) != 1 || de.Types[0] != "text/uri-list" {
 					t.Fatalf("unexpected event: %#v", evs[1])
 				}
-				reader := de.Open()
+				reader := de.Open("text/uri-list")
 				data, err := io.ReadAll(reader)
 				if err := reader.Close(); err != nil {
 					t.Fatal(err)
@@ -231,7 +231,7 @@ func TestExternalDropReplay(t *testing.T) {
 	}
 	assertEventSequence(t, evs[:1], transfer.InitiateEvent{})
 	assertEventSequence(t, evs[2:], transfer.CancelEvent{})
-	reader := evs[1].(transfer.DataEvent).Open()
+	reader := evs[1].(transfer.DataEvent).Open("text/uri-list")
 	data, err := io.ReadAll(reader)
 	if err != nil || string(data) != "file:///tmp/a.txt\r\n" {
 		t.Fatalf("unexpected replayed data: %q, %v", data, err)
@@ -277,7 +277,7 @@ func TestExternalDropDeferred(t *testing.T) {
 	}
 	assertEventSequence(t, evs[:1], transfer.InitiateEvent{})
 	assertEventSequence(t, evs[2:], transfer.CancelEvent{})
-	reader := evs[1].(transfer.DataEvent).Open()
+	reader := evs[1].(transfer.DataEvent).Open("text/uri-list")
 	data, err := io.ReadAll(reader)
 	if err != nil || string(data) != "file:///tmp/a.txt\r\n" {
 		t.Fatalf("deferred data = %q, %v", data, err)

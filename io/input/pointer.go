@@ -314,13 +314,10 @@ func (p *pointerFilter) Matches(e event.Event) bool {
 	case transfer.CancelEvent, transfer.InitiateEvent:
 		return len(p.sourceMimes) > 0 || len(p.targetMimes) > 0
 	case transfer.RequestEvent:
-		if slices.Contains(p.sourceMimes, e.Type) {
-			return true
-		}
+		return slices.Contains(p.sourceMimes, e.Type)
 	case transfer.DataEvent:
-		if slices.Contains(p.targetMimes, e.Type) {
-			return true
-		}
+		_, matched := firstMimeMatch(e.Types, p)
+		return matched
 	}
 	return false
 }
@@ -410,7 +407,7 @@ func (q *pointerQueue) drop(handlers map[event.Tag]*handler, e DropEvent) []tagg
 		return true
 	})
 	p.dataTarget, _ = q.transferTarget(handlers, p.types, p.entered)
-	_, evts = q.offerData(handlers, p, transfer.DataEvent{Type: e.Type, Open: e.Open}, evts)
+	_, evts = q.offerData(handlers, p, transfer.DataEvent{Types: p.types, Open: func(string) io.ReadCloser { return e.Open() }}, evts)
 	return evts
 }
 
@@ -425,8 +422,8 @@ func (q *pointerQueue) offer(handlers map[event.Tag]*handler, state pointerState
 		}
 		state.pointers = slices.Clone(state.pointers)
 		state.pointers[i], evts = q.offerData(handlers, p, transfer.DataEvent{
-			Type: req.Type,
-			Open: func() io.ReadCloser {
+			Types: []string{req.Type},
+			Open: func(string) io.ReadCloser {
 				return req.Data
 			},
 		}, evts)

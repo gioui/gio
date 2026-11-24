@@ -3,12 +3,17 @@
 package app
 
 import (
+	"bytes"
 	"errors"
 	"image"
 	"image/color"
+	"io"
+	"slices"
 
+	"gioui.org/io/clipboard"
 	"gioui.org/io/event"
 	"gioui.org/io/key"
+	"gioui.org/io/transfer"
 	"gioui.org/op"
 
 	"gioui.org/gpu"
@@ -189,8 +194,8 @@ type driver interface {
 	ShowTextInput(show bool)
 	SetInputHint(mode key.InputHint)
 	NewContext() (context, error)
-	// ReadClipboard requests the clipboard content.
-	ReadClipboard()
+	// ReadClipboard requests a single event for the given MIME types.
+	ReadClipboard(types []string)
 	// WriteClipboard requests a clipboard write.
 	WriteClipboard(c clipboardContent)
 	// Configure the window.
@@ -213,11 +218,40 @@ type driver interface {
 
 // clipboardContent is the content of a clipboard write.
 type clipboardContent struct {
-	mime string
-	data []byte
 	// sensitive marks data for clipboard managers where the platform
 	// supports it, see [gioui.org/io/clipboard.WriteCmd].
 	sensitive bool
+	contents  []clipboard.Content
+}
+
+func (c clipboardContent) text() ([]byte, bool) {
+	if len(c.contents) == 0 {
+		return nil, true
+	}
+	for _, content := range c.contents {
+		if content.Type == "application/text" || content.Type == "text/plain" {
+			return content.Data, true
+		}
+	}
+	return nil, false
+}
+
+func clipboardEvent(types []string, data map[string][]byte) transfer.DataEvent {
+	return transfer.DataEvent{Types: types, Open: func(mime string) io.ReadCloser {
+		if !slices.Contains(types, mime) {
+			return nil
+		}
+		return io.NopCloser(bytes.NewReader(data[mime]))
+	}}
+}
+
+func wantsClipboardText(types []string) bool {
+	return slices.Contains(types, "application/text") || slices.Contains(types, "text/plain")
+}
+
+func clipboardTextEvent(types []string, text string) transfer.DataEvent {
+	data := []byte(text)
+	return clipboardEvent(types, map[string][]byte{"application/text": data, "text/plain": data})
 }
 
 type windowRendezvous struct {

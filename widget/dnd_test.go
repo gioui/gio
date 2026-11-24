@@ -61,7 +61,7 @@ func TestDraggable(t *testing.T) {
 		t.Fatalf("expected event")
 	}
 	ev := e.(transfer.DataEvent)
-	if got, want := ev.Type, "file"; got != want {
+	if got, want := ev.Types[0], "file"; got != want {
 		t.Errorf("expected %v; got %v", got, want)
 	}
 	if ofr.closed {

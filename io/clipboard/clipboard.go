@@ -2,17 +2,23 @@
 
 package clipboard
 
-import (
-	"io"
+import "gioui.org/io/event"
 
-	"gioui.org/io/event"
-)
-
-// WriteCmd copies Text to the clipboard.
-type WriteCmd struct {
+// Content is one clipboard representation. Type is the MIME type of Data.
+type Content struct {
 	Type string
-	Data io.ReadCloser
-	// Sensitive marks Data as a secret, such as a password. Where the
+	Data []byte
+}
+
+// WriteCmd replaces the clipboard with all the supplied representations.
+type WriteCmd struct {
+	// Each MIME type should occur at most once. An empty slice clears the clipboard.
+	// All platforms support "application/text" and "text/plain".
+	// Windows also supports "image/png", "text/html",
+	// "application/rtf", and "text/rtf". macOS supports "image/png" and "text/html".
+	// Wayland passes MIME types directly to the clipboard owner.
+	Contents []Content
+	// Sensitive marks the contents as a secret, such as a password. Where the
 	// platform has a convention for it, the clipboard content is marked so
 	// that clipboard managers and system features do not keep or show it:
 	//
@@ -38,10 +44,13 @@ type WriteCmd struct {
 	Sensitive bool
 }
 
-// ReadCmd requests the text of the clipboard, delivered to
-// the handler through an [io/transfer.DataEvent].
+// ReadCmd requests clipboard data. The target receives one [gioui.org/io/transfer.DataEvent]
+// for all requested types. Opening an unavailable representation yields an empty reader.
 type ReadCmd struct {
 	Tag event.Tag
+	// Types lists the MIME types to read. An empty slice requests "application/text".
+	// Supported types are the same as for [WriteCmd].
+	Types []string
 }
 
 func (WriteCmd) ImplementsCommand() {}
