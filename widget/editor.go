@@ -693,6 +693,11 @@ func (e *Editor) updateIMEState(gtx layout.Context) {
 // for the text glyphs+caret and the selectMaterial as the paint material for the
 // selection rectangle.
 func (e *Editor) Layout(gtx layout.Context, lt *text.Shaper, font font.Font, size unit.Sp, textMaterial, selectMaterial op.CallOp) layout.Dimensions {
+	return e.LayoutWithSelectedText(gtx, lt, font, size, textMaterial, selectMaterial, op.CallOp{})
+}
+
+// LayoutWithSelectedText lays out the editor with a separate paint material for selected text.
+func (e *Editor) LayoutWithSelectedText(gtx layout.Context, lt *text.Shaper, font font.Font, size unit.Sp, textMaterial, selectMaterial, selectedTextMaterial op.CallOp) layout.Dimensions {
 	for {
 		_, ok := e.Update(gtx)
 		if !ok {
@@ -701,7 +706,7 @@ func (e *Editor) Layout(gtx layout.Context, lt *text.Shaper, font font.Font, siz
 	}
 
 	e.text.Layout(gtx, lt, font, size)
-	return e.layout(gtx, textMaterial, selectMaterial)
+	return e.layout(gtx, textMaterial, selectMaterial, selectedTextMaterial)
 }
 
 // updateSnippet queues a key.SnippetCmd if the snippet content or position
@@ -747,7 +752,7 @@ func (e *Editor) updateSnippet(gtx layout.Context, start, end int) {
 	gtx.Execute(key.SnippetCmd{Tag: e, Snippet: newSnip})
 }
 
-func (e *Editor) layout(gtx layout.Context, textMaterial, selectMaterial op.CallOp) layout.Dimensions {
+func (e *Editor) layout(gtx layout.Context, textMaterial, selectMaterial, selectedTextMaterial op.CallOp) layout.Dimensions {
 	// Adjust scrolling for new viewport and layout.
 	e.text.ScrollRel(0, 0)
 
@@ -782,7 +787,7 @@ func (e *Editor) layout(gtx layout.Context, textMaterial, selectMaterial op.Call
 	semantic.Editor.Add(gtx.Ops)
 	if e.Len() > 0 {
 		e.paintSelection(gtx, selectMaterial)
-		e.paintText(gtx, textMaterial)
+		e.paintText(gtx, textMaterial, selectedTextMaterial)
 		e.paintComposition(gtx, textMaterial)
 	}
 	if gtx.Enabled() {
@@ -803,9 +808,13 @@ func (e *Editor) paintSelection(gtx layout.Context, material op.CallOp) {
 
 // paintText paints the text glyphs using the provided material to set the fill of the
 // glyphs.
-func (e *Editor) paintText(gtx layout.Context, material op.CallOp) {
+func (e *Editor) paintText(gtx layout.Context, material, selectedTextMaterial op.CallOp) {
 	e.initBuffer()
-	e.text.PaintText(gtx, material)
+	if selectedTextMaterial == (op.CallOp{}) || (!gtx.Focused(e) && !e.PaintSelectionWhenUnfocused) {
+		e.text.PaintText(gtx, material)
+		return
+	}
+	e.text.PaintSelectedText(gtx, material, selectedTextMaterial)
 }
 
 func (e *Editor) paintComposition(gtx layout.Context, material op.CallOp) {

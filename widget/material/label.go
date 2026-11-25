@@ -25,6 +25,8 @@ type LabelStyle struct {
 	Color color.NRGBA
 	// SelectionColor is the color of the background for selected text.
 	SelectionColor color.NRGBA
+	// SelectedTextColor is the color of selected text. If zero alpha, Color is used.
+	SelectedTextColor color.NRGBA
 	// Alignment specify the text alignment.
 	Alignment text.Alignment
 	// MaxLines limits the number of lines. Zero means no limit.
@@ -129,6 +131,13 @@ func (l LabelStyle) Layout(gtx layout.Context) layout.Dimensions {
 	selectColorMacro := op.Record(gtx.Ops)
 	paint.ColorOp{Color: l.SelectionColor}.Add(gtx.Ops)
 	selectColor := selectColorMacro.Stop()
+	selectedTextColor := l.Color
+	if l.SelectedTextColor.A != 0 {
+		selectedTextColor = l.SelectedTextColor
+	}
+	selectedTextMacro := op.Record(gtx.Ops)
+	paint.ColorOp{Color: selectedTextColor}.Add(gtx.Ops)
+	selectedTextMaterial := selectedTextMacro.Stop()
 
 	if l.State != nil {
 		if l.State.Text() != l.Text {
@@ -140,7 +149,7 @@ func (l LabelStyle) Layout(gtx layout.Context) layout.Dimensions {
 		l.State.WrapPolicy = l.WrapPolicy
 		l.State.LineHeight = l.LineHeight
 		l.State.LineHeightScale = l.LineHeightScale
-		return l.State.Layout(gtx, l.Shaper, l.Font, l.TextSize, textColor, selectColor)
+		return l.State.LayoutWithSelectedText(gtx, l.Shaper, l.Font, l.TextSize, textColor, selectColor, selectedTextMaterial)
 	}
 	tl := widget.Label{
 		Alignment:       l.Alignment,

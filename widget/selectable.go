@@ -111,8 +111,16 @@ func (l *Selectable) paintSelection(gtx layout.Context, material op.CallOp) {
 
 // paintText paints the text glyphs with the provided material.
 func (l *Selectable) paintText(gtx layout.Context, material op.CallOp) {
+	l.paintTextWithSelection(gtx, material, op.CallOp{})
+}
+
+func (l *Selectable) paintTextWithSelection(gtx layout.Context, material, selectedTextMaterial op.CallOp) {
 	l.initialize()
-	l.text.PaintText(gtx, material)
+	if selectedTextMaterial == (op.CallOp{}) || (!l.focused && !l.PaintSelectionWhenUnfocused) {
+		l.text.PaintText(gtx, material)
+		return
+	}
+	l.text.PaintSelectedText(gtx, material, selectedTextMaterial)
 }
 
 // SelectionLen returns the length of the selection, in runes; it is
@@ -185,6 +193,11 @@ func (l *Selectable) Update(gtx layout.Context) bool {
 // the text and selection rectangles. The provided textMaterial and selectionMaterial ops are used to set the
 // paint material for the text and selection rectangles, respectively.
 func (l *Selectable) Layout(gtx layout.Context, lt *text.Shaper, font font.Font, size unit.Sp, textMaterial, selectionMaterial op.CallOp) layout.Dimensions {
+	return l.LayoutWithSelectedText(gtx, lt, font, size, textMaterial, selectionMaterial, op.CallOp{})
+}
+
+// LayoutWithSelectedText lays out the selectable with a separate paint material for selected text.
+func (l *Selectable) LayoutWithSelectedText(gtx layout.Context, lt *text.Shaper, font font.Font, size unit.Sp, textMaterial, selectionMaterial, selectedTextMaterial op.CallOp) layout.Dimensions {
 	l.Update(gtx)
 	l.text.LineHeight = l.LineHeight
 	l.text.LineHeightScale = l.LineHeightScale
@@ -202,7 +215,7 @@ func (l *Selectable) Layout(gtx layout.Context, lt *text.Shaper, font font.Font,
 	l.dragger.Add(gtx.Ops)
 
 	l.paintSelection(gtx, selectionMaterial)
-	l.paintText(gtx, textMaterial)
+	l.paintTextWithSelection(gtx, textMaterial, selectedTextMaterial)
 	return dims
 }
 

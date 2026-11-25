@@ -32,7 +32,9 @@ type EditorStyle struct {
 	HintColor color.NRGBA
 	// SelectionColor is the color of the background for selected text.
 	SelectionColor color.NRGBA
-	Editor         *widget.Editor
+	// SelectedTextColor is the color of selected text. If zero alpha, Color is used.
+	SelectedTextColor color.NRGBA
+	Editor            *widget.Editor
 
 	shaper *text.Shaper
 }
@@ -63,6 +65,13 @@ func (e EditorStyle) Layout(gtx layout.Context) layout.Dimensions {
 	selectionColorMacro := op.Record(gtx.Ops)
 	paint.ColorOp{Color: blendDisabledColor(!gtx.Enabled(), e.SelectionColor)}.Add(gtx.Ops)
 	selectionColor := selectionColorMacro.Stop()
+	selectedTextColor := e.Color
+	if e.SelectedTextColor.A != 0 {
+		selectedTextColor = e.SelectedTextColor
+	}
+	selectedTextMacro := op.Record(gtx.Ops)
+	paint.ColorOp{Color: selectedTextColor}.Add(gtx.Ops)
+	selectedTextMaterial := selectedTextMacro.Stop()
 
 	var maxlines int
 	if e.Editor.SingleLine {
@@ -87,7 +96,7 @@ func (e EditorStyle) Layout(gtx layout.Context) layout.Dimensions {
 	}
 	e.Editor.LineHeight = e.LineHeight
 	e.Editor.LineHeightScale = e.LineHeightScale
-	dims = e.Editor.Layout(gtx, e.shaper, e.Font, e.TextSize, textColor, selectionColor)
+	dims = e.Editor.LayoutWithSelectedText(gtx, e.shaper, e.Font, e.TextSize, textColor, selectionColor, selectedTextMaterial)
 	if e.Editor.Len() == 0 {
 		call.Add(gtx.Ops)
 	}
