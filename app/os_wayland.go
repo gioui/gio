@@ -1819,10 +1819,16 @@ func gio_onDataSourceSend(data unsafe.Pointer, source *C.struct_wl_data_source, 
 			content = []byte(passwordManagerHintValue)
 		}
 	}
-	go func() {
-		defer syscall.Close(int(fd))
-		syscall.Write(int(fd), content)
-	}()
+	go writeClipboard(int(fd), content)
+}
+
+// writeClipboard writes all of content to fd and closes it. Unlike a single
+// write, os.File.Write continues after a short write.
+func writeClipboard(fd int, content []byte) error {
+	f := os.NewFile(uintptr(fd), "clipboard")
+	defer f.Close()
+	_, err := f.Write(content)
+	return err
 }
 
 //export gio_onDataSourceCancelled
