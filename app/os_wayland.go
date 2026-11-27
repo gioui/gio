@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -120,13 +121,17 @@ type wlSeat struct {
 	serial C.uint32_t
 	// The most recent pointer enter serial.
 	pointerSerial C.uint32_t
+	// The serial and window for the primary-button drag gesture.
+	dragSerial C.uint32_t
+	dragWindow *window
 
 	pointerFocus  *window
 	keyboardFocus *window
 	touchFoci     map[C.int32_t]*window
 
-	// Clipboard support.
+	// Clipboard and drag-and-drop support.
 	dataDev *C.struct_wl_data_device
+	drag    wlDrag
 	// offers is a map from active wl_data_offers to
 	// the list of mime types they support.
 	offers map[*C.struct_wl_data_offer][]string
@@ -138,7 +143,45 @@ type wlSeat struct {
 	// clipboard write, if any.
 	source *C.struct_wl_data_source
 	// content is the content belonging to source.
-	content clipboardContent
+	content    clipboardContent
+	dragSource *wlDragSource
+}
+
+type wlDragSource struct {
+	source  *C.struct_wl_data_source
+	window  *window
+	content map[string][]byte
+}
+
+func (d *wlDragSource) finish() {
+	if s := d.window.disp.seat; s != nil && s.dragSource == d {
+		s.dragSource = nil
+	}
+	if d.source != nil {
+		callbackDelete(unsafe.Pointer(d.source))
+		C.wl_data_source_destroy(d.source)
+		d.source = nil
+	}
+	d.window.w.DragEnded()
+}
+
+// wlDrag tracks a drag-and-drop offer over a window.
+type wlDrag struct {
+	window   *window
+	offer    *C.struct_wl_data_offer
+	serial   C.uint32_t
+	action   C.uint32_t
+	position f32.Point
+	mime     string
+}
+
+// wlDrop is the data read from a dropped offer.
+type wlDrop struct {
+	offer *C.struct_wl_data_offer
+	mime  string
+	pos   f32.Point
+	data  []byte
+	err   error
 }
 
 type repeatState struct {
@@ -218,6 +261,12 @@ type window struct {
 	inCompositor bool        // window is moving or being resized
 
 	clipReads chan transfer.DataEvent
+
+	dropTypes []string
+	// dropOffer is the offer currently routed to this window.
+	dropOffer *C.struct_wl_data_offer
+	dropMimes []string
+	drops     chan wlDrop
 
 	wakeups chan struct{}
 
@@ -326,6 +375,11 @@ func (d *wlDisplay) readClipboard() (io.ReadCloser, error) {
 	if s.clipboard == nil {
 		return nil, nil
 	}
+	return receiveOffer(s.clipboard, s.mimeType)
+}
+
+// receiveOffer returns a reader for the data of offer in the mime format.
+func receiveOffer(offer *C.struct_wl_data_offer, mime string) (io.ReadCloser, error) {
 	r, w, err := os.Pipe()
 	if err != nil {
 		return nil, err
@@ -333,9 +387,9 @@ func (d *wlDisplay) readClipboard() (io.ReadCloser, error) {
 	// wl_data_offer_receive performs and implicit dup(2) of the write end
 	// of the pipe. Close our version.
 	defer w.Close()
-	cmimeType := C.CString(s.mimeType)
-	defer C.free(unsafe.Pointer(cmimeType))
-	C.wl_data_offer_receive(s.clipboard, cmimeType, C.int(w.Fd()))
+	cmime := C.CString(mime)
+	defer C.free(unsafe.Pointer(cmime))
+	C.wl_data_offer_receive(offer, cmime, C.int(w.Fd()))
 	return r, nil
 }
 
@@ -367,6 +421,7 @@ func (d *wlDisplay) createNativeWindow(options []Option) (*window, error) {
 		ppsp:      ppdp,
 		wakeups:   make(chan struct{}, 1),
 		clipReads: make(chan transfer.DataEvent, 1),
+		drops:     make(chan wlDrop, 1),
 	}
 	// Default to server-side decorations.
 	if w.decor != nil {
@@ -483,14 +538,13 @@ func gio_onSeatCapabilities(data unsafe.Pointer, seat *C.struct_wl_seat, caps C.
 	s.updateCaps(caps)
 }
 
-// flushOffers remove all wl_data_offers that isn't the clipboard
-// content.
+// flushOffers removes all wl_data_offers except the clipboard
+// and the current drag.
 func (s *wlSeat) flushOffers() {
 	for o := range s.offers {
-		if o == s.clipboard {
+		if o == s.clipboard || o == s.drag.offer {
 			continue
 		}
-		// We're only interested in clipboard offers.
 		delete(s.offers, o)
 		callbackDelete(unsafe.Pointer(o))
 		C.wl_data_offer_destroy(o)
@@ -501,6 +555,9 @@ func (s *wlSeat) destroy() {
 	if s.source != nil {
 		C.wl_data_source_destroy(s.source)
 		s.source = nil
+	}
+	if s.dragSource != nil {
+		s.dragSource.finish()
 	}
 	if s.im != nil {
 		C.zwp_text_input_v3_destroy(s.im)
@@ -517,6 +574,10 @@ func (s *wlSeat) destroy() {
 	if s.keyboard != nil {
 		C.wl_keyboard_release(s.keyboard)
 	}
+	if w := s.drag.window; w != nil && w.dropOffer == s.drag.offer {
+		w.cancelDrop()
+	}
+	s.drag = wlDrag{}
 	s.clipboard = nil
 	s.flushOffers()
 	if s.dataDev != nil {
@@ -746,6 +807,9 @@ func gio_onRegistryGlobal(data unsafe.Pointer, reg *C.struct_wl_registry, name C
 func gio_onDataOfferOffer(data unsafe.Pointer, offer *C.struct_wl_data_offer, mime *C.char) {
 	s := callbackLoad(data).(*wlSeat)
 	s.offers[offer] = append(s.offers[offer], C.GoString(mime))
+	if s.drag.offer == offer {
+		s.updateDrag(true)
+	}
 }
 
 //export gio_onDataOfferSourceActions
@@ -754,6 +818,10 @@ func gio_onDataOfferSourceActions(data unsafe.Pointer, offer *C.struct_wl_data_o
 
 //export gio_onDataOfferAction
 func gio_onDataOfferAction(data unsafe.Pointer, offer *C.struct_wl_data_offer, act C.uint32_t) {
+	s := callbackLoad(data).(*wlSeat)
+	if offer == s.drag.offer {
+		s.drag.action = act
+	}
 }
 
 //export gio_onDataDeviceOffer
@@ -768,19 +836,104 @@ func gio_onDataDeviceOffer(data unsafe.Pointer, dataDev *C.struct_wl_data_device
 func gio_onDataDeviceEnter(data unsafe.Pointer, dataDev *C.struct_wl_data_device, serial C.uint32_t, surf *C.struct_wl_surface, x, y C.wl_fixed_t, id *C.struct_wl_data_offer) {
 	s := callbackLoad(data).(*wlSeat)
 	s.serial = serial
+	w := callbackLoad(unsafe.Pointer(surf)).(*window)
+	s.drag = wlDrag{
+		window:   w,
+		offer:    id,
+		serial:   serial,
+		position: f32.Pt(fromFixed(x), fromFixed(y)).Mul(float32(w.scale)),
+	}
 	s.flushOffers()
+	if id != nil {
+		C.wl_data_offer_set_actions(id, C.WL_DATA_DEVICE_MANAGER_DND_ACTION_COPY, C.WL_DATA_DEVICE_MANAGER_DND_ACTION_COPY)
+	}
+	s.updateDrag(true)
 }
 
 //export gio_onDataDeviceLeave
 func gio_onDataDeviceLeave(data unsafe.Pointer, dataDev *C.struct_wl_data_device) {
+	s := callbackLoad(data).(*wlSeat)
+	if w := s.drag.window; w != nil && w.dropOffer == s.drag.offer {
+		w.cancelDrop()
+	}
+	s.drag = wlDrag{}
+	s.flushOffers()
 }
 
 //export gio_onDataDeviceMotion
 func gio_onDataDeviceMotion(data unsafe.Pointer, dataDev *C.struct_wl_data_device, t C.uint32_t, x, y C.wl_fixed_t) {
+	s := callbackLoad(data).(*wlSeat)
+	if w := s.drag.window; w != nil {
+		s.drag.position = f32.Pt(fromFixed(x), fromFixed(y)).Mul(float32(w.scale))
+		s.updateDrag(true)
+	}
 }
 
 //export gio_onDataDeviceDrop
 func gio_onDataDeviceDrop(data unsafe.Pointer, dataDev *C.struct_wl_data_device) {
+	s := callbackLoad(data).(*wlSeat)
+	w, id := s.drag.window, s.drag.offer
+	if w == nil || id == nil || w.dropOffer != id ||
+		s.drag.action != C.WL_DATA_DEVICE_MANAGER_DND_ACTION_COPY || s.drag.mime == "" {
+		gio_onDataDeviceLeave(data, dataDev)
+		return
+	}
+	mime, pos := s.drag.mime, s.drag.position
+	r, err := receiveOffer(id, mime)
+	if err != nil {
+		gio_onDataDeviceLeave(data, dataDev)
+		return
+	}
+	// The drag stays in progress until the data is read. The offer is
+	// destroyed after that, so keep it from being flushed.
+	delete(s.offers, id)
+	s.drag = wlDrag{}
+	disp := w.disp
+	go func() {
+		b, err := io.ReadAll(r)
+		r.Close()
+		w.drops <- wlDrop{offer: id, mime: mime, pos: pos, data: b, err: err}
+		disp.wakeup()
+	}()
+}
+
+// updateDrag reports the drag to its window and selects an accepted MIME type.
+func (s *wlSeat) updateDrag(moved bool) {
+	w, id := s.drag.window, s.drag.offer
+	if w == nil || id == nil {
+		return
+	}
+	var types []string
+	for _, mime := range s.offers[id] {
+		if slices.Contains(w.dropTypes, mime) && !slices.Contains(types, mime) {
+			types = append(types, mime)
+		}
+	}
+	if w.dropOffer != id || !slices.Equal(w.dropMimes, types) {
+		w.cancelDrop()
+		if len(types) > 0 {
+			w.dropOffer = id
+			w.dropMimes = types
+			w.ProcessEvent(transfer.InitiateEvent{Types: types})
+		}
+		moved = true
+	}
+	if len(types) > 0 && moved {
+		w.ProcessEvent(pointer.Event{Kind: pointer.Drag, Source: pointer.Mouse, Position: s.drag.position})
+	}
+	var mime *C.char
+	s.drag.mime = ""
+	for _, typ := range types {
+		if w.w.AcceptsTransferAt(typ, s.drag.position) {
+			s.drag.mime = typ
+			mime = C.CString(typ)
+			break
+		}
+	}
+	if mime != nil {
+		defer C.free(unsafe.Pointer(mime))
+	}
+	C.wl_data_offer_accept(id, s.drag.serial, mime)
 }
 
 //export gio_onDataDeviceSelection
@@ -901,6 +1054,10 @@ func gio_onPointerLeave(data unsafe.Pointer, p *C.struct_wl_pointer, serial C.ui
 	w := callbackLoad(unsafe.Pointer(surf)).(*window)
 	s := callbackLoad(data).(*wlSeat)
 	s.serial = serial
+	if s.dragWindow == w {
+		s.dragSerial = 0
+		s.dragWindow = nil
+	}
 	s.pointerFocus = nil
 	if w.inCompositor {
 		w.inCompositor = false
@@ -957,12 +1114,18 @@ func gio_onPointerButton(data unsafe.Pointer, p *C.struct_wl_pointer, serial, t,
 				return
 			}
 		}
+		s.dragSerial = serial
+		s.dragWindow = w
 	}
 	var kind pointer.Kind
 	switch state {
 	case 0:
 		w.pointerBtns &^= btn
 		kind = pointer.Release
+		if btn == pointer.ButtonPrimary {
+			s.dragSerial = 0
+			s.dragWindow = nil
+		}
 		// Move or resize gestures no longer applies.
 		w.inCompositor = false
 	case 1:
@@ -1439,6 +1602,8 @@ func (w *window) dispatch() {
 	case e := <-w.clipReads:
 		w.disp.readClipClose = nil
 		w.ProcessEvent(e)
+	case d := <-w.drops:
+		w.dropReceived(d)
 	case <-w.wakeups:
 		w.w.Invalidate()
 	default:
@@ -1496,6 +1661,44 @@ func (w *window) Run(f func()) {
 
 func (w *window) Frame(frame *op.Ops) {
 	w.w.ProcessFrame(frame, nil)
+	if s := w.disp.seat; s != nil && s.drag.window == w {
+		// The frame may have moved the targets under the drag.
+		s.updateDrag(false)
+	}
+}
+
+func (w *window) SetDropTypes(types []string) {
+	w.dropTypes = types
+	if s := w.disp.seat; s != nil && s.drag.window == w {
+		s.updateDrag(true)
+	}
+}
+
+func (w *window) StartDrag(data map[string][]byte) {
+	s := w.disp.seat
+	if s == nil || s.dataDev == nil || s.dragSource != nil ||
+		s.dragWindow != w || w.pointerBtns&pointer.ButtonPrimary == 0 {
+		w.w.DragEnded()
+		return
+	}
+	source := C.wl_data_device_manager_create_data_source(w.disp.dataDeviceManager)
+	if source == nil {
+		w.w.DragEnded()
+		return
+	}
+	drag := &wlDragSource{source: source, window: w, content: data}
+	callbackStore(unsafe.Pointer(source), drag)
+	C.wl_data_source_add_listener(source, &C.gio_data_source_listener, unsafe.Pointer(source))
+	for mime := range data {
+		cmime := C.CString(mime)
+		C.wl_data_source_offer(source, cmime)
+		C.free(unsafe.Pointer(cmime))
+	}
+	C.wl_data_source_set_actions(source, C.WL_DATA_DEVICE_MANAGER_DND_ACTION_COPY)
+	C.wl_data_device_start_drag(s.dataDev, source, w.surf, nil, s.dragSerial)
+	s.dragSource = drag
+	s.dragSerial = 0
+	s.dragWindow = nil
 }
 
 // bindDataDevice initializes the dataDev field if and only if both
@@ -1582,6 +1785,18 @@ func (d *wlDisplay) wakeup() {
 }
 
 func (w *window) destroy() {
+	if s := w.disp.seat; s != nil {
+		if s.dragWindow == w {
+			s.dragSerial = 0
+			s.dragWindow = nil
+		}
+		if s.dragSource != nil && s.dragSource.window == w {
+			s.dragSource.finish()
+		}
+		if s.drag.window == w && w.dropOffer == s.drag.offer {
+			w.cancelDrop()
+		}
+	}
 	if s := w.disp.seat; s != nil && s.imFocus == w {
 		s.imState.clearPreedit(w.w)
 		s.imFocus = nil
@@ -1809,30 +2024,44 @@ func gio_onDataSourceTarget(data unsafe.Pointer, source *C.struct_wl_data_source
 
 //export gio_onDataSourceSend
 func gio_onDataSourceSend(data unsafe.Pointer, source *C.struct_wl_data_source, mime *C.char, fd C.int32_t) {
-	s := callbackLoad(data).(*wlSeat)
-	content := s.content.data
-	if C.GoString(mime) == passwordManagerHintType {
-		// The hint is all a clipboard manager asking for it gets, never the
-		// content.
-		content = nil
-		if s.content.sensitive {
-			content = []byte(passwordManagerHintValue)
+	var content []byte
+	mimeType := C.GoString(mime)
+	switch drag := callbackLoad(data).(type) {
+	case *wlDragSource:
+		content = drag.content[mimeType]
+	case *wlSeat:
+		content = drag.content.data
+		if mimeType == passwordManagerHintType {
+			content = nil
+			if drag.content.sensitive {
+				content = []byte(passwordManagerHintValue)
+			}
 		}
 	}
 	go func() {
 		defer syscall.Close(int(fd))
-		syscall.Write(int(fd), content)
+		for len(content) > 0 {
+			n, err := syscall.Write(int(fd), content)
+			if err != nil {
+				return
+			}
+			content = content[n:]
+		}
 	}()
 }
 
 //export gio_onDataSourceCancelled
 func gio_onDataSourceCancelled(data unsafe.Pointer, source *C.struct_wl_data_source) {
-	s := callbackLoad(data).(*wlSeat)
-	if s.source == source {
-		s.content = clipboardContent{}
-		s.source = nil
+	switch sourceData := callbackLoad(data).(type) {
+	case *wlDragSource:
+		sourceData.finish()
+	case *wlSeat:
+		if sourceData.source == source {
+			sourceData.content = clipboardContent{}
+			sourceData.source = nil
+		}
+		C.wl_data_source_destroy(source)
 	}
-	C.wl_data_source_destroy(source)
 }
 
 //export gio_onDataSourceDNDDropPerformed
@@ -1841,6 +2070,9 @@ func gio_onDataSourceDNDDropPerformed(data unsafe.Pointer, source *C.struct_wl_d
 
 //export gio_onDataSourceDNDFinished
 func gio_onDataSourceDNDFinished(data unsafe.Pointer, source *C.struct_wl_data_source) {
+	if drag, ok := callbackLoad(data).(*wlDragSource); ok {
+		drag.finish()
+	}
 }
 
 //export gio_onDataSourceAction
@@ -2024,7 +2256,32 @@ func (w *window) surface() (*C.struct_wl_surface, int, int) {
 	return w.surf, sz.X, sz.Y
 }
 
-func (w *window) SetFileDropEnabled(enabled bool) {}
+func (w *window) cancelDrop() {
+	if w.dropOffer == nil {
+		return
+	}
+	w.dropOffer = nil
+	w.dropMimes = nil
+	w.ProcessEvent(transfer.CancelEvent{})
+}
+
+func (w *window) dropReceived(d wlDrop) {
+	if d.err == nil {
+		C.wl_data_offer_finish(d.offer)
+	}
+	callbackDelete(unsafe.Pointer(d.offer))
+	C.wl_data_offer_destroy(d.offer)
+	if w.dropOffer != d.offer {
+		return
+	}
+	w.dropOffer = nil
+	w.dropMimes = nil
+	if d.err != nil {
+		w.ProcessEvent(transfer.CancelEvent{})
+		return
+	}
+	w.ProcessEvent(platformDrop(d.pos, d.mime, d.data))
+}
 
 func (w *window) ShowTextInput(show bool) {
 	w.textInput = show

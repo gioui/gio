@@ -52,7 +52,10 @@ type Router struct {
 	// Changes queued for next call to Frame.
 	commands []Command
 	// transfers is the pending transfer.DataEvent.Open functions.
-	transfers []io.ReadCloser
+	transfers    []io.ReadCloser
+	dragOffers   map[string][]byte
+	offerRequest *dragRequest
+	dragSource   event.Tag
 	// deferring is set if command execution and event delivery is deferred
 	// to the next frame.
 	deferring bool
@@ -118,22 +121,6 @@ type SemanticID uint
 type SystemEvent struct {
 	Event event.Event
 }
-
-// DropEvent reports data dropped onto a window from another application.
-// Router sends [transfer.InitiateEvent] and [transfer.CancelEvent] to matching
-// targets. The target at Position also receives a [transfer.DataEvent].
-type DropEvent struct {
-	// Position is the drop location in window coordinates, in pixels.
-	Position f32.Point
-	// Type is the MIME type of the offered data.
-	Type string
-	// Open returns a new reader on each call so Router can replay the event.
-	// The data must remain available until the event is processed.
-	// Router closes unused readers. The target closes readers it opens.
-	Open func() io.ReadCloser
-}
-
-func (DropEvent) ImplementsEvent() {}
 
 // handler contains the per-handler state tracked by a [Router].
 type handler struct {
@@ -497,19 +484,70 @@ func (q *Router) processEvent(e event.Event, system bool) {
 			evts = append(evts, taggedEvent{tag: f, event: e})
 		}
 		q.changeState(e, state, evts)
+	// A platform reports a drag from another application with an InitiateEvent,
+	// pointer.Drag events, and either a DataEvent or CancelEvent.
+	case transfer.InitiateEvent:
+		pstate, evts := q.pointer.queue.initiateExternal(q.handlers, state.pointerState, e.Types)
+		state.pointerState = pstate
+		q.changeState(e, state, evts)
 	case transfer.DataEvent:
+		if e.ExternalDrop {
+			pstate, evts := q.pointer.queue.dropExternal(q.handlers, state.pointerState, e)
+			state.pointerState = pstate
+			q.changeState(e, state, evts)
+			break
+		}
 		cstate, evts := q.cqueue.Push(state.clipboardState, e)
 		state.clipboardState = cstate
 		q.changeState(e, state, evts)
-	case DropEvent:
-		evts := q.pointer.queue.drop(q.handlers, e)
+	case transfer.CancelEvent:
+		pstate, evts := q.pointer.queue.cancelExternal(q.handlers, state.pointerState)
+		state.pointerState = pstate
 		q.changeState(e, state, evts)
 	default:
 		panic("unknown event type")
 	}
 }
 
+func mimeIntersection(source, target []string) []string {
+	var matched []string
+	for _, mime := range source {
+		if slices.Contains(target, mime) && !slices.Contains(matched, mime) {
+			matched = append(matched, mime)
+		}
+	}
+	return matched
+}
+
 func (q *Router) execute(c Command) {
+	if offer, ok := c.(transfer.OfferCmd); ok && q.pointer.queue.platformDrags {
+		if req := q.state().outgoing; req != nil && req.tag == offer.Tag && slices.Contains(req.types, offer.Type) {
+			if q.offerRequest != req {
+				q.offerRequest, q.dragOffers = req, make(map[string][]byte)
+			}
+			if offer.Data != nil {
+				data, err := io.ReadAll(offer.Data)
+				offer.Data.Close()
+				if err == nil {
+					q.dragOffers[offer.Type] = data
+				}
+			}
+			return
+		}
+		local := false
+		for _, drag := range q.state().local {
+			if drag.source == offer.Tag {
+				local = true
+				break
+			}
+		}
+		if !local {
+			if offer.Data != nil {
+				offer.Data.Close()
+			}
+			return
+		}
+	}
 	// The command can be executed immediately if event delivery is not frozen, and
 	// no event receiver has completed their event handling.
 	if !q.deferring {
@@ -612,7 +650,9 @@ func (q *Router) changeState(e event.Event, state inputState, evts []taggedEvent
 	if len(q.changes) == 0 {
 		q.changes = append(q.changes, stateChange{})
 	}
-	if e != nil && len(evts) > 0 {
+	// A drag may move without triggering events, but must still be replayed.
+	transferring := state.transferring() || q.lastState().transferring()
+	if e != nil && (len(evts) > 0 || transferring) {
 		// An event triggered events bound for user receivers. Add a state change to be
 		// able to redo the change in case of a command execution.
 		q.changes = append(q.changes, stateChange{event: e, state: state, events: evts})
@@ -744,6 +784,71 @@ func (q *Router) AcceptsTransfer(mime string) bool {
 		}
 	}
 	return false
+}
+
+// AcceptsTransferAt reports whether a handler at position accepts mime.
+// Position is in window coordinates, in pixels.
+func (q *Router) AcceptsTransferAt(mime string, position f32.Point) bool {
+	return q.pointer.queue.acceptsTransferAt(q.handlers, mime, position)
+}
+
+// SetPlatformDrags enables handing mouse drag sources to the window system.
+func (q *Router) SetPlatformDrags(enabled bool) { q.pointer.queue.platformDrags = enabled }
+
+// TakeDrag returns the representations supplied by a drag source in this frame.
+// The platform owns them until its drag session ends.
+func (q *Router) TakeDrag() map[string][]byte {
+	req := q.offerRequest
+	data := q.dragOffers
+	q.offerRequest, q.dragOffers = nil, nil
+	state := q.state()
+	if req == nil || state.outgoing != req || len(data) == 0 {
+		return nil
+	}
+	state.outgoing = nil
+	if handler := q.handlers[req.tag]; handler == nil || handler.pointer.areaPlusOne == 0 || q.dragSource != nil {
+		q.changeState(nil, state, []taggedEvent{{tag: req.tag, event: transfer.CancelEvent{}}})
+		return nil
+	}
+	var evts []taggedEvent
+	for i, p := range state.pointers {
+		if p.id != req.pointer {
+			continue
+		}
+		for _, tag := range p.handlers {
+			evts = append(evts, taggedEvent{tag: tag, event: pointer.Event{Kind: pointer.Cancel}})
+		}
+		state.pointers = slices.Delete(slices.Clone(state.pointers), i, i+1)
+		break
+	}
+	q.dragSource = req.tag
+	q.changeState(nil, state, evts)
+	return data
+}
+
+// EndDrag notifies the source that the platform has finished with its offer.
+func (q *Router) EndDrag() {
+	if tag := q.dragSource; tag != nil {
+		q.dragSource = nil
+		q.changeState(nil, q.lastState(), []taggedEvent{{tag: tag, event: transfer.CancelEvent{}}})
+	}
+}
+
+// TransferTargetTypes lists the formats accepted by the current frame's drop targets.
+func (q *Router) TransferTargetTypes() []string {
+	var types []string
+	for _, h := range q.handlers {
+		if h.pointer.areaPlusOne == 0 {
+			continue
+		}
+		for _, mime := range h.filter.pointer.targetMimes {
+			if !slices.Contains(types, mime) {
+				types = append(types, mime)
+			}
+		}
+	}
+	slices.Sort(types)
+	return types
 }
 
 // TextInputState returns the input state from the most recent

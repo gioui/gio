@@ -14,6 +14,7 @@ import (
 	"time"
 	"unicode"
 	"unicode/utf8"
+	"unsafe"
 
 	"gioui.org/internal/f32"
 	"gioui.org/io/event"
@@ -44,15 +45,13 @@ __attribute__ ((visibility ("hidden"))) CFTypeRef gio_createView(int presentWith
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_createWindow(CFTypeRef viewRef, CGFloat width, CGFloat height);
 __attribute__ ((visibility ("hidden"))) void gio_viewSetHandle(CFTypeRef viewRef, uintptr_t handle);
 
-static void setFileDrop(CFTypeRef viewRef, bool accept) {
-	@autoreleasepool {
-		NSView *view = (__bridge NSView *)viewRef;
-		if (accept) {
-			[view registerForDraggedTypes:@[NSPasteboardTypeFileURL, NSFilenamesPboardType]];
-		} else {
-			[view unregisterDraggedTypes];
-		}
-	}
+void gio_setDropTypes(CFTypeRef view, CFTypeRef types);
+void gio_startDrag(CFTypeRef view, CFTypeRef item);
+static CFTypeRef newDragTypes(void) {return (__bridge_retained CFTypeRef)[NSMutableArray new];}
+static void addDragType(CFTypeRef types, CFTypeRef mime) {[(__bridge NSMutableArray *)types addObject:(__bridge NSString *)mime];}
+static CFTypeRef newDragItem(void) {return (__bridge_retained CFTypeRef)[NSMutableDictionary new];}
+static void setDragData(CFTypeRef item, CFTypeRef mime, void *bytes, size_t size) {
+	[(__bridge NSMutableDictionary *)item setObject:[NSData dataWithBytes:bytes length:size] forKey:(__bridge NSString *)mime];
 }
 
 static void writeClipboard(CFTypeRef str, int sensitive) {
@@ -591,10 +590,6 @@ func (w *window) EditorStateChanged(old, new editorState) {
 	}
 }
 
-func (w *window) SetFileDropEnabled(enabled bool) {
-	C.setFileDrop(w.view, C.bool(enabled))
-}
-
 func (w *window) ShowTextInput(show bool) {}
 
 func (w *window) SetInputHint(_ key.InputHint) {}
@@ -769,8 +764,79 @@ func gio_onMouse(h C.uintptr_t, evt C.CFTypeRef, cdir C.int, cbtn C.NSInteger, x
 	})
 }
 
+func (w *window) SetDropTypes(types []string) {
+	array := C.newDragTypes()
+	defer C.CFRelease(array)
+	for _, mime := range types {
+		name := stringToNSString(mime)
+		C.addDragType(array, name)
+		C.CFRelease(name)
+	}
+	C.gio_setDropTypes(w.view, array)
+	if len(types) == 0 {
+		w.ProcessEvent(transfer.CancelEvent{})
+	}
+}
+
+func (w *window) StartDrag(data map[string][]byte) {
+	item := C.newDragItem()
+	defer C.CFRelease(item)
+	for mime, data := range data {
+		name := stringToNSString(mime)
+		C.setDragData(item, name, unsafe.Pointer(unsafe.SliceData(data)), C.size_t(len(data)))
+		C.CFRelease(name)
+	}
+	C.gio_startDrag(w.view, item)
+}
+
+//export gio_onDragEnded
+func gio_onDragEnded(h C.uintptr_t) { windowFor(h).w.DragEnded() }
+
+//export gio_onPlatformDrag
+func gio_onPlatformDrag(h C.uintptr_t, types C.CFTypeRef, count C.NSUInteger, x, y C.CGFloat) C.NSInteger {
+	w := windowFor(h)
+	pos := f32.Point{X: float32(x) * w.scale, Y: float32(y) * w.scale}
+	var offered []string
+	for index := range int(count) {
+		offered = append(offered, nsstringToString(C.fileDropPath(types, C.NSUInteger(index))))
+	}
+	w.platformDragEvent(transfer.InitiateEvent{Types: offered})
+	w.platformDragEvent(pointer.Event{Kind: pointer.Drag, Source: pointer.Mouse, Position: pos})
+	for index, mime := range offered {
+		if w.w.AcceptsTransferAt(mime, pos) {
+			return C.NSInteger(index)
+		}
+	}
+	return -1
+}
+
+//export gio_onDataDrop
+func gio_onDataDrop(h C.uintptr_t, mime C.CFTypeRef, data unsafe.Pointer, size C.NSUInteger, x, y C.CGFloat) C.bool {
+	w := windowFor(h)
+	pos := f32.Pt(float32(x)*w.scale, float32(y)*w.scale)
+	if uint64(size) > uint64(^uint(0)>>1) {
+		return false
+	}
+	bytes := append([]byte(nil), unsafe.Slice((*byte)(data), int(size))...)
+	w.ProcessEvent(platformDrop(pos, nsstringToString(mime), bytes))
+	return true
+}
+
+//export gio_onPlatformDragExited
+func gio_onPlatformDragExited(h C.uintptr_t) {
+	windowFor(h).platformDragEvent(transfer.CancelEvent{})
+}
+
+func (w *window) platformDragEvent(e event.Event) {
+	w.ProcessEvent(e)
+	// AppKit tracks the drag in its own event loop, so draw here.
+	if w.anim && w.view != 0 {
+		w.draw()
+	}
+}
+
 //export gio_onFileDrop
-func gio_onFileDrop(h C.uintptr_t, paths C.CFTypeRef, count C.NSUInteger, x, y C.CGFloat) {
+func gio_onFileDrop(h C.uintptr_t, paths C.CFTypeRef, count C.NSUInteger, x, y C.CGFloat) C.bool {
 	w := windowFor(h)
 	files := make([]string, 0, int(count))
 	for i := range int(count) {
@@ -779,9 +845,10 @@ func gio_onFileDrop(h C.uintptr_t, paths C.CFTypeRef, count C.NSUInteger, x, y C
 		}
 	}
 	if len(files) > 0 {
-		pos := f32.Point{X: float32(x) * w.scale, Y: float32(y) * w.scale}
+		pos := f32.Pt(float32(x)*w.scale, float32(y)*w.scale)
 		w.ProcessEvent(fileDropEvent(pos, files))
 	}
+	return C.bool(len(files) > 0)
 }
 
 //export gio_onDraw

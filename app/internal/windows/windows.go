@@ -7,6 +7,9 @@ package windows
 import (
 	"fmt"
 	"runtime"
+	"sync"
+	"sync/atomic"
+	stdsyscall "syscall"
 	"time"
 	"unicode/utf16"
 	"unsafe"
@@ -29,6 +32,52 @@ type CandidateForm struct {
 
 type Rect struct {
 	Left, Top, Right, Bottom int32
+}
+
+// Interface IDs from unknwn.h and oleidl.h in the Windows SDK.
+var (
+	IID_IUnknown        = syscall.GUID{Data4: [8]byte{0xc0, 0, 0, 0, 0, 0, 0, 0x46}}
+	IID_IDropTarget     = syscall.GUID{Data1: 0x122, Data4: [8]byte{0xc0, 0, 0, 0, 0, 0, 0, 0x46}}
+	IID_IDropSource     = syscall.GUID{Data1: 0x121, Data4: [8]byte{0xc0, 0, 0, 0, 0, 0, 0, 0x46}}
+	IID_IDataObject     = syscall.GUID{Data1: 0x10e, Data4: [8]byte{0xc0, 0, 0, 0, 0, 0, 0, 0x46}}
+	clsidDragDropHelper = syscall.GUID{Data1: 0x4657278a, Data2: 0x411b, Data3: 0x11d2, Data4: [8]byte{0x83, 0x9a, 0, 0xc0, 0x4f, 0xd9, 0x18, 0xd0}}
+	iidDropTargetHelper = syscall.GUID{Data1: 0x4657278b, Data2: 0x411b, Data3: 0x11d2, Data4: [8]byte{0x83, 0x9a, 0, 0xc0, 0x4f, 0xd9, 0x18, 0xd0}}
+)
+
+type FormatEtc struct {
+	Format uint16
+	Device uintptr
+	Aspect uint32
+	Index  int32
+	Tymed  uint32
+}
+
+type StgMedium struct {
+	Tymed         uint32
+	Handle        syscall.Handle
+	UnkForRelease uintptr
+}
+
+type DataObject struct {
+	Vtbl *struct {
+		QueryInterface, AddRef, Release    uintptr
+		GetData, GetDataHere, QueryGetData uintptr
+		GetCanonicalFormatEtc, SetData     uintptr
+	}
+}
+
+type dropSource struct {
+	vtbl *[5]uintptr
+	refs int32
+}
+
+type dropTargetHelperVtbl struct {
+	QueryInterface, AddRef, Release            uintptr
+	DragEnter, DragLeave, DragOver, Drop, Show uintptr
+}
+
+type DropTargetHelper struct {
+	vtbl *dropTargetHelperVtbl
 }
 
 type WndClassEx struct {
@@ -373,7 +422,6 @@ const (
 	WM_NCPOINTERUPDATE       = 0x0241
 	WM_NCPOINTERDOWN         = 0x0242
 	WM_NCPOINTERUP           = 0x0243
-	WM_DROPFILES             = 0x0233
 	WM_PAINT                 = 0x000F
 	WM_POINTERCAPTURECHANGED = 0x024C
 	WM_POINTERDOWN           = 0x0246
@@ -426,10 +474,19 @@ const (
 
 	GHND = 0x0042
 
-	CF_UNICODETEXT = 13
-	IMAGE_BITMAP   = 0
-	IMAGE_ICON     = 1
-	IMAGE_CURSOR   = 2
+	CF_UNICODETEXT   = 13
+	CF_HDROP         = 15
+	DVASPECT_CONTENT = 1
+	TYMED_HGLOBAL    = 1
+	DROPEFFECT_COPY  = 1
+
+	DRAGDROP_S_DROP              = 0x00040100
+	DRAGDROP_S_CANCEL            = 0x00040101
+	DRAGDROP_S_USEDEFAULTCURSORS = 0x00040102
+	MK_LBUTTON                   = 0x0001
+	IMAGE_BITMAP                 = 0
+	IMAGE_ICON                   = 1
+	IMAGE_CURSOR                 = 2
 
 	LR_CREATEDIBSECTION = 0x00002000
 	LR_DEFAULTCOLOR     = 0x00000000
@@ -527,24 +584,193 @@ var (
 	dwmapi                        = syscall.NewLazySystemDLL("dwmapi")
 	_DwmExtendFrameIntoClientArea = dwmapi.NewProc("DwmExtendFrameIntoClientArea")
 
-	shell32          = syscall.NewLazySystemDLL("shell32")
-	_DragAcceptFiles = shell32.NewProc("DragAcceptFiles")
-	_DragQueryFileW  = shell32.NewProc("DragQueryFileW")
-	_DragQueryPoint  = shell32.NewProc("DragQueryPoint")
-	_DragFinish      = shell32.NewProc("DragFinish")
+	shell32             = syscall.NewLazySystemDLL("shell32")
+	_DragQueryFileW     = shell32.NewProc("DragQueryFileW")
+	_SHCreateDataObject = shell32.NewProc("SHCreateDataObject")
+	_SHDoDragDrop       = shell32.NewProc("SHDoDragDrop")
+	_GlobalSize         = kernel32.NewProc("GlobalSize")
+
+	ole32             = syscall.NewLazySystemDLL("ole32")
+	_OleInitialize    = ole32.NewProc("OleInitialize")
+	_OleUninitialize  = ole32.NewProc("OleUninitialize")
+	_RegisterDragDrop = ole32.NewProc("RegisterDragDrop")
+	_RevokeDragDrop   = ole32.NewProc("RevokeDragDrop")
+	_ReleaseStgMedium = ole32.NewProc("ReleaseStgMedium")
+	_CoCreateInstance = ole32.NewProc("CoCreateInstance")
+	_DoDragDrop       = ole32.NewProc("DoDragDrop")
 )
+
+var (
+	dropSourceOnce sync.Once
+	dropSourceVtbl [5]uintptr
+)
+
+func OleInitialize() error {
+	r, _, _ := _OleInitialize.Call(0)
+	if int32(r) < 0 {
+		return fmt.Errorf("OleInitialize: %#x", uint32(r))
+	}
+	return nil
+}
+
+func OleUninitialize() {
+	_OleUninitialize.Call()
+}
+
+func RegisterDragDrop(hwnd syscall.Handle, target unsafe.Pointer) error {
+	r, _, _ := _RegisterDragDrop.Call(uintptr(hwnd), uintptr(target))
+	if int32(r) < 0 {
+		return fmt.Errorf("RegisterDragDrop: %#x", uint32(r))
+	}
+	return nil
+}
+
+func RevokeDragDrop(hwnd syscall.Handle) error {
+	r, _, _ := _RevokeDragDrop.Call(uintptr(hwnd))
+	if int32(r) < 0 {
+		return fmt.Errorf("RevokeDragDrop: %#x", uint32(r))
+	}
+	return nil
+}
+
+func NewDropTargetHelper() *DropTargetHelper {
+	var helper *DropTargetHelper
+	r, _, _ := _CoCreateInstance.Call(
+		uintptr(unsafe.Pointer(&clsidDragDropHelper)),
+		0,
+		1,
+		uintptr(unsafe.Pointer(&iidDropTargetHelper)),
+		uintptr(unsafe.Pointer(&helper)),
+	)
+	if int32(r) < 0 {
+		return nil
+	}
+	return helper
+}
+
+func (h *DropTargetHelper) DragEnter(hwnd syscall.Handle, data *DataObject, pt *Point, effect uint32) {
+	stdsyscall.SyscallN(h.vtbl.DragEnter, uintptr(unsafe.Pointer(h)), uintptr(hwnd), uintptr(unsafe.Pointer(data)), uintptr(unsafe.Pointer(pt)), uintptr(effect))
+}
+
+func (h *DropTargetHelper) DragOver(pt *Point, effect uint32) {
+	stdsyscall.SyscallN(h.vtbl.DragOver, uintptr(unsafe.Pointer(h)), uintptr(unsafe.Pointer(pt)), uintptr(effect))
+}
+
+func (h *DropTargetHelper) DragLeave() {
+	stdsyscall.SyscallN(h.vtbl.DragLeave, uintptr(unsafe.Pointer(h)))
+}
+
+func (h *DropTargetHelper) Drop(data *DataObject, pt *Point, effect uint32) {
+	stdsyscall.SyscallN(h.vtbl.Drop, uintptr(unsafe.Pointer(h)), uintptr(unsafe.Pointer(data)), uintptr(unsafe.Pointer(pt)), uintptr(effect))
+}
+
+func (h *DropTargetHelper) Release() {
+	stdsyscall.SyscallN(h.vtbl.Release, uintptr(unsafe.Pointer(h)))
+}
+
+func ReleaseStgMedium(medium *StgMedium) {
+	_ReleaseStgMedium.Call(uintptr(unsafe.Pointer(medium)))
+}
+
+func (d *DataObject) QueryGetData(format *FormatEtc) bool {
+	r, _, _ := stdsyscall.SyscallN(d.Vtbl.QueryGetData, uintptr(unsafe.Pointer(d)), uintptr(unsafe.Pointer(format)))
+	return int32(r) == 0
+}
+
+func (d *DataObject) GetData(format *FormatEtc) (StgMedium, error) {
+	var medium StgMedium
+	r, _, _ := stdsyscall.SyscallN(d.Vtbl.GetData, uintptr(unsafe.Pointer(d)), uintptr(unsafe.Pointer(format)), uintptr(unsafe.Pointer(&medium)))
+	if int32(r) < 0 {
+		return medium, fmt.Errorf("IDataObject.GetData: %#x", uint32(r))
+	}
+	return medium, nil
+}
+
+func NewDragData() (*DataObject, error) {
+	var obj *DataObject
+	result, _, _ := _SHCreateDataObject.Call(0, 0, 0, 0, uintptr(unsafe.Pointer(&IID_IDataObject)), uintptr(unsafe.Pointer(&obj)))
+	if int32(result) < 0 {
+		return nil, fmt.Errorf("SHCreateDataObject: %#x", uint32(result))
+	}
+	return obj, nil
+}
+
+func (d *DataObject) Release() { stdsyscall.SyscallN(d.Vtbl.Release, uintptr(unsafe.Pointer(d))) }
+
+func (d *DataObject) SetData(format *FormatEtc, medium *StgMedium) bool {
+	result, _, _ := stdsyscall.SyscallN(d.Vtbl.SetData, uintptr(unsafe.Pointer(d)), uintptr(unsafe.Pointer(format)), uintptr(unsafe.Pointer(medium)), 1)
+	return int32(result) >= 0
+}
+
+func (d *DataObject) DoDragDrop() {
+	dropSourceOnce.Do(func() {
+		queryInterface := func(s *dropSource, iid *syscall.GUID, out **dropSource) uintptr {
+			if out == nil {
+				return uintptr(syscall.E_POINTER)
+			}
+			if *iid != IID_IUnknown && *iid != IID_IDropSource {
+				*out = nil
+				return uintptr(syscall.E_NOINTERFACE)
+			}
+			*out = s
+			s.addRef()
+			return 0
+		}
+		queryContinueDrag := func(s *dropSource, escape, keys uintptr) uintptr {
+			if escape != 0 {
+				return DRAGDROP_S_CANCEL
+			}
+			if keys&MK_LBUTTON == 0 {
+				return DRAGDROP_S_DROP
+			}
+			return 0
+		}
+		giveFeedback := func(s *dropSource, effect uintptr) uintptr {
+			return DRAGDROP_S_USEDEFAULTCURSORS
+		}
+		dropSourceVtbl = [5]uintptr{
+			syscall.NewCallback(queryInterface),
+			syscall.NewCallback((*dropSource).addRef),
+			syscall.NewCallback((*dropSource).release),
+			syscall.NewCallback(queryContinueDrag),
+			syscall.NewCallback(giveFeedback),
+		}
+	})
+	ptr, err := syscall.LocalAlloc(syscall.LPTR, uint32(unsafe.Sizeof(dropSource{})))
+	if err != nil {
+		return
+	}
+	source := (*dropSource)(unsafe.Pointer(ptr))
+	*source = dropSource{vtbl: &dropSourceVtbl, refs: 1}
+	defer source.release()
+	var effect uint32
+	_DoDragDrop.Call(uintptr(unsafe.Pointer(d)), uintptr(unsafe.Pointer(source)), DROPEFFECT_COPY, uintptr(unsafe.Pointer(&effect)))
+}
+
+func (d *DataObject) ShellDoDragDrop(hwnd syscall.Handle) {
+	var effect uint32
+	_SHDoDragDrop.Call(uintptr(hwnd), uintptr(unsafe.Pointer(d)), 0, DROPEFFECT_COPY, uintptr(unsafe.Pointer(&effect)))
+}
+
+func (s *dropSource) addRef() uintptr {
+	return uintptr(atomic.AddInt32(&s.refs, 1))
+}
+
+func (s *dropSource) release() uintptr {
+	refs := atomic.AddInt32(&s.refs, -1)
+	if refs == 0 {
+		syscall.LocalFree(syscall.Handle(uintptr(unsafe.Pointer(s))))
+	}
+	return uintptr(refs)
+}
+
+func GlobalSize(handle syscall.Handle) uintptr {
+	size, _, _ := _GlobalSize.Call(uintptr(handle))
+	return size
+}
 
 func AdjustWindowRectExForDpi(r *Rect, dwStyle uint32, bMenu int, dwExStyle uint32, dpi int) {
 	_AdjustWindowRectExForDpi.Call(uintptr(unsafe.Pointer(r)), uintptr(dwStyle), uintptr(bMenu), uintptr(dwExStyle), uintptr(dpi))
-}
-
-// DragAcceptFiles enables or disables file drops for a window.
-func DragAcceptFiles(hwnd syscall.Handle, accept bool) {
-	var enabled uintptr
-	if accept {
-		enabled = 1
-	}
-	_DragAcceptFiles.Call(uintptr(hwnd), enabled)
 }
 
 func DragQueryFile(hDrop syscall.Handle, index uint32, buf []uint16) uint32 {
@@ -555,17 +781,6 @@ func DragQueryFile(hDrop syscall.Handle, index uint32, buf []uint16) uint32 {
 		uintptr(len(buf)),
 	)
 	return uint32(r)
-}
-
-// DragQueryPoint reports the drop position and whether it is in the client area.
-func DragQueryPoint(hDrop syscall.Handle) (Point, bool) {
-	var point Point
-	r, _, _ := _DragQueryPoint.Call(uintptr(hDrop), uintptr(unsafe.Pointer(&point)))
-	return point, r != 0
-}
-
-func DragFinish(hDrop syscall.Handle) {
-	_DragFinish.Call(uintptr(hDrop))
 }
 
 func CallMsgFilter(m *Msg, nCode uintptr) bool {

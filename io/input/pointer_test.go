@@ -926,6 +926,72 @@ func TestEllipse(t *testing.T) {
 	assertEventPointerTypeSequence(t, events(&r, -1, f), pointer.Press)
 }
 
+func TestTransferFirstMoveOutsideSource(t *testing.T) {
+	var r Router
+	var ops op.Ops
+	var source, target int
+	sourceFilter := transfer.SourceFilter{Target: &source, Type: "file"}
+	targetFilter := transfer.TargetFilter{Target: &target, Type: "file"}
+	events(&r, -1, sourceFilter, targetFilter)
+	sourceArea := clip.Rect(image.Rect(0, 0, 10, 10)).Push(&ops)
+	event.Op(&ops, &source)
+	sourceArea.Pop()
+	targetArea := clip.Rect(image.Rect(10, 0, 20, 10)).Push(&ops)
+	event.Op(&ops, &target)
+	targetArea.Pop()
+	r.Frame(&ops)
+	r.Queue(
+		pointer.Event{Kind: pointer.Press, Source: pointer.Mouse, Position: f32.Pt(5, 5)},
+		pointer.Event{Kind: pointer.Move, Source: pointer.Mouse, Position: f32.Pt(15, 5)},
+		pointer.Event{Kind: pointer.Release, Source: pointer.Mouse, Position: f32.Pt(15, 5)},
+	)
+	assertEventSequence(t, events(&r, -1, sourceFilter), transfer.RequestEvent{Type: "file"})
+}
+
+func TestTransferInitiateMIMEIntersection(t *testing.T) {
+	var r Router
+	var ops op.Ops
+	var source, target int
+	for _, mime := range []string{"text/plain", "image/png"} {
+		r.Event(transfer.SourceFilter{Target: &source, Type: mime})
+	}
+	targetFilter := transfer.TargetFilter{Target: &target, Type: "image/png"}
+	r.Event(targetFilter)
+	sourceArea := clip.Rect(image.Rect(0, 0, 10, 10)).Push(&ops)
+	event.Op(&ops, &source)
+	sourceArea.Pop()
+	targetArea := clip.Rect(image.Rect(10, 0, 20, 10)).Push(&ops)
+	event.Op(&ops, &target)
+	targetArea.Pop()
+	r.Frame(&ops)
+	r.Queue(
+		pointer.Event{Kind: pointer.Press, Source: pointer.Mouse, Position: f32.Pt(5, 5)},
+		pointer.Event{Kind: pointer.Move, Source: pointer.Mouse, Position: f32.Pt(15, 5)},
+	)
+	assertEventSequence(t, events(&r, -1, targetFilter), transfer.InitiateEvent{Types: []string{"image/png"}})
+}
+
+func TestTransferSourceRemovedBeforeFirstMove(t *testing.T) {
+	var r Router
+	var ops op.Ops
+	var source, target int
+	sourceFilter := transfer.SourceFilter{Target: &source, Type: "file"}
+	targetFilter := transfer.TargetFilter{Target: &target, Type: "file"}
+	r.Event(sourceFilter)
+	event.Op(&ops, &source)
+	r.Frame(&ops)
+	r.Queue(pointer.Event{Kind: pointer.Press, Source: pointer.Mouse})
+	ops.Reset()
+	r.Event(targetFilter)
+	event.Op(&ops, &target)
+	r.Frame(&ops)
+	r.Queue(
+		pointer.Event{Kind: pointer.Move, Source: pointer.Mouse, Position: f32.Pt(5, 5)},
+		pointer.Event{Kind: pointer.Release, Source: pointer.Mouse, Position: f32.Pt(5, 5)},
+	)
+	assertEventSequence(t, events(&r, -1, sourceFilter, targetFilter))
+}
+
 func TestTransfer(t *testing.T) {
 	srcArea := image.Rect(0, 0, 20, 20)
 	tgtArea := srcArea.Add(image.Pt(40, 0))
@@ -945,6 +1011,73 @@ func TestTransfer(t *testing.T) {
 		return src, tgt
 	}
 
+	t.Run("cancel pointer", func(t *testing.T) {
+		var r Router
+		var ops op.Ops
+		src, tgt := setup(&r, &ops, "file", "file")
+		r.Frame(&ops)
+		r.Queue(
+			pointer.Event{Kind: pointer.Press, Position: f32.Pt(10, 10)},
+			pointer.Event{Kind: pointer.Move, Position: f32.Pt(40, 10)},
+			pointer.Event{Kind: pointer.Cancel},
+		)
+		assertEventSequence(t, events(&r, -1, transfer.SourceFilter{Target: src, Type: "file"}), transfer.CancelEvent{})
+		assertEventSequence(t, events(&r, -1, transfer.TargetFilter{Target: tgt, Type: "file"}),
+			transfer.InitiateEvent{Types: []string{"file"}}, transfer.CancelEvent{})
+	})
+
+	t.Run("hover", func(t *testing.T) {
+		var r Router
+		var ops op.Ops
+		src, tgt := setup(&r, &ops, "file", "file")
+		target := transfer.TargetFilter{Target: tgt, Type: "file"}
+		hover := pointer.Filter{Target: tgt, Kinds: pointer.Enter | pointer.Leave | pointer.Drag | pointer.Cancel}
+		events(&r, -1, hover)
+		other := addPointerHandler(&r, &ops, new(int), image.Rect(20, 0, 40, 20))
+		r.Frame(&ops)
+		r.Queue(
+			pointer.Event{Kind: pointer.Press, Position: f32.Pt(10, 10)},
+			pointer.Event{Kind: pointer.Move, Position: f32.Pt(10, 10)},
+		)
+		assertEventTypeSequence(t, events(&r, -1, target), transfer.InitiateEvent{})
+		// Handlers outside the transfer are canceled and ignored.
+		assertEventPointerTypeSequence(t, events(&r, -1, other), pointer.Cancel)
+		r.Queue(pointer.Event{Kind: pointer.Move, Position: f32.Pt(30, 10)})
+		assertEventSequence(t, events(&r, -1, other))
+		r.Queue(pointer.Event{Kind: pointer.Move, Position: f32.Pt(45, 10)})
+		evts := events(&r, -1, hover)
+		assertEventPointerTypeSequence(t, evts, pointer.Enter, pointer.Drag)
+		if evts[1].(pointer.Event).Priority == pointer.Grabbed {
+			t.Error("drop target received the grab priority of the source")
+		}
+		r.Queue(pointer.Event{Kind: pointer.Leave})
+		assertEventPointerTypeSequence(t, events(&r, -1, hover), pointer.Leave)
+		r.Queue(pointer.Event{Kind: pointer.Move, Position: f32.Pt(45, 10)})
+		assertEventPointerTypeSequence(t, events(&r, -1, hover), pointer.Enter, pointer.Drag)
+		r.Queue(pointer.Event{Kind: pointer.Cancel})
+		assertEventSequence(t, events(&r, -1, target), transfer.CancelEvent{})
+		assertEventPointerTypeSequence(t, events(&r, -1, hover), pointer.Cancel)
+		assertEventSequence(t, events(&r, -1, transfer.SourceFilter{Target: src, Type: "file"}), transfer.CancelEvent{})
+	})
+
+	t.Run("other touch keeps its handler", func(t *testing.T) {
+		var r Router
+		var ops op.Ops
+		setup(&r, &ops, "file", "file")
+		other := addPointerHandler(&r, &ops, new(int), image.Rect(60, 0, 80, 20))
+		r.Frame(&ops)
+		r.Queue(pointer.Event{Kind: pointer.Press, Source: pointer.Touch, PointerID: 2, Position: f32.Pt(65, 5)})
+		events(&r, -1, other)
+		r.Queue(
+			pointer.Event{Kind: pointer.Press, Source: pointer.Touch, PointerID: 1, Position: f32.Pt(5, 5)},
+			pointer.Event{Kind: pointer.Move, Source: pointer.Touch, PointerID: 1, Position: f32.Pt(5, 5)},
+			pointer.Event{Kind: pointer.Move, Source: pointer.Touch, PointerID: 2, Position: f32.Pt(65, 5)},
+			pointer.Event{Kind: pointer.Release, Source: pointer.Touch, PointerID: 2, Position: f32.Pt(65, 5)},
+		)
+		other.Kinds = pointer.Cancel | pointer.Drag | pointer.Release
+		assertEventPointerTypeSequence(t, events(&r, -1, other), pointer.Drag, pointer.Release)
+	})
+
 	t.Run("drop on no target", func(t *testing.T) {
 		ops := new(op.Ops)
 		var r Router
@@ -962,7 +1095,7 @@ func TestTransfer(t *testing.T) {
 			},
 		)
 		assertEventSequence(t, events(&r, -1, transfer.SourceFilter{Target: src, Type: "file"}))
-		assertEventSequence(t, events(&r, -1, transfer.TargetFilter{Target: tgt, Type: "file"}), transfer.InitiateEvent{})
+		assertEventSequence(t, events(&r, -1, transfer.TargetFilter{Target: tgt, Type: "file"}), transfer.InitiateEvent{Types: []string{"file"}})
 
 		// Drop.
 		r.Queue(
@@ -1001,7 +1134,7 @@ func TestTransfer(t *testing.T) {
 			},
 		)
 		assertEventSequence(t, events(&r, -1, transfer.SourceFilter{Target: src, Type: "file"}))
-		assertEventSequence(t, events(&r, -1, transfer.TargetFilter{Target: tgt1, Type: "file"}), transfer.InitiateEvent{})
+		assertEventSequence(t, events(&r, -1, transfer.TargetFilter{Target: tgt1, Type: "file"}), transfer.InitiateEvent{Types: []string{"file"}})
 		assertEventSequence(t, events(&r, -1, transfer.TargetFilter{Target: tgt2, Type: "nofile"}))
 	})
 
@@ -1053,7 +1186,7 @@ func TestTransfer(t *testing.T) {
 				Kind:     pointer.Move,
 			},
 		)
-		assertEventSequence(t, events(&r, 1, transfer.TargetFilter{Target: tgt, Type: "file"}), transfer.InitiateEvent{})
+		assertEventSequence(t, events(&r, 1, transfer.TargetFilter{Target: tgt, Type: "file"}), transfer.InitiateEvent{Types: []string{"file"}})
 
 		// Drop.
 		r.Queue(
@@ -1135,7 +1268,7 @@ func TestTransfer(t *testing.T) {
 			pointer.Event{Kind: pointer.Press, Position: f32.Pt(10, 10)},
 			pointer.Event{Kind: pointer.Move, Position: f32.Pt(10, 10)},
 		)
-		assertEventSequence(t, events(&r, -1, transfer.TargetFilter{Target: tgt, Type: "text/plain"}), transfer.InitiateEvent{})
+		assertEventSequence(t, events(&r, -1, transfer.TargetFilter{Target: tgt, Type: "text/plain"}), transfer.InitiateEvent{Types: []string{"text/plain"}})
 		events(&r, -1, transfer.SourceFilter{Target: src, Type: "image/png"})
 		events(&r, -1, transfer.TargetFilter{Target: tgt, Type: "image/png"})
 		r.Frame(&ops)
@@ -1156,20 +1289,16 @@ func TestTransfer(t *testing.T) {
 			pointer.Event{Kind: pointer.Release, Position: f32.Pt(40, 10)},
 		)
 		assertEventSequence(t, events(&r, -1, source), transfer.RequestEvent{Type: "file"})
-		assertEventSequence(t, events(&r, -1, target), transfer.InitiateEvent{})
-		r.Queue(DropEvent{
-			Position: f32.Pt(40, 10),
-			Type:     "file",
-			Open: func() io.ReadCloser {
-				return io.NopCloser(strings.NewReader("external"))
-			},
-		})
+		assertEventSequence(t, events(&r, -1, target), transfer.InitiateEvent{Types: []string{"file"}})
+		r.Queue(drop(f32.Pt(40, 10), "file", func() io.ReadCloser {
+			return io.NopCloser(strings.NewReader("external"))
+		})...)
 		assertEventSequence(t, events(&r, -1, source))
 		evs := events(&r, -1, target)
 		if len(evs) != 3 {
 			t.Fatalf("received %v; want initiate, data, cancel", evs)
 		}
-		assertEventSequence(t, evs[:1], transfer.InitiateEvent{})
+		assertEventSequence(t, evs[:1], transfer.InitiateEvent{Types: []string{"file"}})
 		assertEventSequence(t, evs[2:], transfer.CancelEvent{})
 		reader := evs[1].(transfer.DataEvent).Open()
 		data, err := io.ReadAll(reader)

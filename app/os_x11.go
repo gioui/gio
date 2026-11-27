@@ -334,8 +334,6 @@ func (w *x11Window) SetCursor(cursor pointer.Cursor) {
 	C.XDefineCursor(w.x, w.xw, c)
 }
 
-func (w *x11Window) SetFileDropEnabled(enabled bool) {}
-
 func (w *x11Window) ShowTextInput(show bool) {}
 
 func (w *x11Window) SetInputHint(_ key.InputHint) {}

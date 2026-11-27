@@ -8,6 +8,7 @@ import (
 	"image"
 	"image/color"
 	"runtime"
+	"slices"
 	"sync"
 	"time"
 	"unicode/utf8"
@@ -76,8 +77,8 @@ type Window struct {
 		*material.Theme
 		*widget.Decorations
 	}
-	fileDropEnabled bool
-	nocontext       bool
+	dropTypes []string
+	nocontext bool
 	// semantic data, lazily evaluated if requested by a backend to speed up
 	// the cases where semantic data is not needed.
 	semantic struct {
@@ -253,9 +254,15 @@ func (w *Window) updateState() {
 	}
 	w.semantic.uptodate = false
 	q := &w.queue
-	if accept := q.AcceptsTransfer("text/uri-list"); accept != w.fileDropEnabled {
-		w.fileDropEnabled = accept
-		w.driver.SetFileDropEnabled(accept)
+	if native, ok := w.driver.(platformDragDriver); ok {
+		types := q.TransferTargetTypes()
+		if !slices.Equal(types, w.dropTypes) {
+			w.dropTypes = types
+			native.SetDropTypes(types)
+		}
+		if data := q.TakeDrag(); data != nil {
+			native.StartDrag(data)
+		}
 	}
 	switch q.TextInputState() {
 	case input.TextInputOpen:
@@ -414,10 +421,19 @@ func (c *callbacks) SetDriver(d driver) {
 	c.w.invMu.Lock()
 	defer c.w.invMu.Unlock()
 	c.w.driver = d
+	_, native := d.(platformDragDriver)
+	c.w.queue.SetPlatformDrags(native)
 }
 
 func (c *callbacks) ProcessFrame(frame *op.Ops, ack chan<- struct{}) {
 	c.w.processFrame(frame, ack)
+}
+
+func (c *callbacks) DragEnded() {
+	c.w.queue.EndDrag()
+	if c.w.driver != nil {
+		c.Invalidate()
+	}
 }
 
 func (c *callbacks) ProcessEvent(e event.Event) bool {
@@ -519,6 +535,10 @@ func (c *callbacks) ClickFocus() {
 
 func (c *callbacks) ActionAt(p f32.Point) (system.Action, bool) {
 	return c.w.queue.ActionAt(p)
+}
+
+func (c *callbacks) AcceptsTransferAt(mime string, p f32.Point) bool {
+	return c.w.queue.AcceptsTransferAt(mime, p)
 }
 
 func (w *Window) destroyGPU() {
